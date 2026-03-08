@@ -1,0 +1,28 @@
+### Verbo GET – listar todos
+GET http://localhost:8000/produto/ HTTP/1.1
+### Verbo GET – listar um
+GET http://localhost:8000/produto/10 HTTP/1.1
+### Verbo POST – adicionar
+POST http://127.0.0.1:8000/produto/ HTTP/1.1
+Content-Type: application/json
+
+{
+  "nome": "Camiseta Básica",
+  "descricao": "Camiseta de algodão manga curta",
+  "foto": "iVBORw0KGgoAAAANSUhEUgAA...",
+  "valor_unitario": 49.90
+}
+
+### Verbo PUT – atualiza
+PUT http://127.0.0.1:8000/produto/2 HTTP/1.1
+Content-Type: application/json
+
+{
+  "nome": "Camiseta Básica",
+  "descricao": "Camiseta de algodão manga curta",
+  "foto": "iVBORw0KGgoAAAANSUhEUgAA...",
+  "valor_unitario": 49.90
+}
+
+### Verbo DELETE - excluir
+DELETE http://127.0.0.1:8000/produto/3 HTTP/1.1
