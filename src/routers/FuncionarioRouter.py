@@ -35,7 +35,7 @@ async def get_funcionario(id: int, db: Session = Depends(get_db)):
         funcionario = db.query(FuncionarioDB).filter(FuncionarioDB.id == id).first()
         if not funcionario:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funcionário não encontrado")
-            return funcionario
+        return funcionario
     except HTTPException:
         raise
     except Exception as e:
