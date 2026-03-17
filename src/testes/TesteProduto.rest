@@ -2,7 +2,7 @@
 ### Verbo GET – listar todos
 GET http://localhost:8000/produto/ HTTP/1.1
 ### Verbo GET – listar um
-GET http://localhost:8000/produto/10 HTTP/1.1
+GET http://localhost:8000/produto/1 HTTP/1.1
 ### Verbo POST – adicionar
 POST http://127.0.0.1:8000/produto/ HTTP/1.1
 Content-Type: application/json
@@ -20,7 +20,7 @@ Content-Type: application/json
 
 {
   "nome": "Camiseta Básica 10",
-  "descricao": "Camiseta de algodão manga curta",
+  "descricao": "Camiseta de algodão",
   "foto": "aGVsbG8gd29ybGQ=",
   "valor_unitario": 49.90
 }

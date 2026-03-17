@@ -31,7 +31,7 @@ async def get_produto(db: Session = Depends(get_db)):
         )
 
 
-@router.get("/produto/{id}", response_model=List[ProdutoResponse], tags=["Produto"], status_code=status.HTTP_200_OK)
+@router.get("/produto/{id}", response_model=ProdutoResponse, tags=["Produto"], status_code=status.HTTP_200_OK)
 async def get_produto(id: int, db: Session = Depends(get_db)):
     """Retorna um produto específico pelo ID"""
     try:
@@ -65,14 +65,13 @@ async def post_produto(produto_data: ProdutoCreate, db: Session = Depends(get_db
         id=None, # Será auto-incrementado
         nome=produto_data.nome,
         descricao=produto_data.descricao,
-        foto=base64_to_bytes(produto_data.foto) if produto_data.foto else None,
+        foto=produto_data.foto,
         valor_unitario=produto_data.valor_unitario
         )
         
         db.add(novo_produto)
         db.commit()
         db.refresh(novo_produto)
-        novo_produto.foto = bytes_to_base64(novo_produto.foto) if novo_produto.foto else None
         return novo_produto
     except HTTPException:
         raise
@@ -101,15 +100,15 @@ async def put_produto(id: int, produto_data: ProdutoUpdate, db: Session = Depend
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Já existe um produto com este nome"
                 )
             
-        # Atualiza apenas os campos fornecidos
-        produto_data.foto = base64_to_bytes(produto_data.foto) if produto_data.foto else None
         update_data = produto_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
+            print('\n')
+            print(field, value)
+            print('\n')
             setattr(produto, field, value)
-            db.commit()
-            db.refresh(produto)
-            produto.foto = bytes_to_base64(produto.foto) if produto.foto else None
-            return produto
+        db.commit()
+        db.refresh(produto)
+        return produto
         
     except HTTPException:
         raise
