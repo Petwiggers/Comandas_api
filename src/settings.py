@@ -29,7 +29,7 @@ else: # SQLite
     STR_DATABASE = f"sqlite:///apiDatabase.db"
     
 # Configurações JWT
-SECRET_KEY = os.getenv("SECRET_KEY", "hgfcjhvhgvhjbvjhgcvjhbjhgvjhbkjvgh")
+SECRET_KEY = os.getenv("SECRET_KEY", "SECRET_KEY = dcf035c36a4ba578a91101076e8d0f18269af71fd7f220f99280bc0b23937ad0")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
