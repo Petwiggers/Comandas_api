@@ -2,7 +2,7 @@
 ### Verbo GET – listar todos
 GET http://localhost:8000/funcionario/ HTTP/1.1
 ### Verbo GET – listar um
-GET http://localhost:8000/funcionario/10 HTTP/1.1
+GET http://localhost:8000/funcionario/1 HTTP/1.1
 ### Verbo POST – adicionar
 POST http://127.0.0.1:8000/funcionario/ HTTP/1.1
 Content-Type: application/json
@@ -22,10 +22,10 @@ Content-Type: application/json
 
 {
   "nome": "Peterson Wiggers",
-  "matricula": "MAT2026001",
+  "matricula": "MAT2001",
   "cpf": "12345678901",
   "telefone": "49999998888",
-  "grupo": 2,
+  "grupo": 3,
   "senha": "senha123"
 }
 
