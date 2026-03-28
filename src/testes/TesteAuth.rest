@@ -1,0 +1,30 @@
+### token gerado
+
+@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzMzMzMzMzMzMyIsImlkIjo0LCJncnVwbyI6MywiZXhwIjoxNzc0NzMwMzA3LCJ0eXBlIjoiYWNjZXNzIn0.a5K6TBvCMJ2l2EjwxOzKP3Q-iZ6hocHm16R8coRfnDo
+@refresh_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzMzMzMzMzMzMyIsImlkIjo0LCJncnVwbyI6MywiZXhwIjoxNzc1MzM0MjA3LCJ0eXBlIjoicmVmcmVzaCJ9.M4W5bFU-51uiwG7qiy8WOttNXbSGnYNC0ykDWOapJmw
+
+### Login para obter access e refresh tokens
+POST http://127.0.0.1:8000/auth/login HTTP/1.1
+content-type: application/json
+
+{
+"cpf" : "33333333333",
+"senha" : "senha123"
+}
+
+### Login para obter access e refresh tokens através do refresh token
+POST http://127.0.0.1:8000/auth/refresh HTTP/1.1
+content-type: application/json
+
+{
+ "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzMzMzMzMzMzMyIsImlkIjo0LCJncnVwbyI6MywiZXhwIjoxNzc1MzMzOTMwLCJ0eXBlIjoicmVmcmVzaCJ9.RZOru1-sVCDmo2EO7pIR8cwaI4oscSJEhx8FOZPRHhQ"
+}
+
+### Login para obter dados do usuário autenticadado
+GET http://127.0.0.1:8000/auth/me HTTP/1.1
+Authorization: Bearer {{access_token}}
+
+### Login para obter dados do usuário autenticadado
+POST http://127.0.0.1:8000/auth/logout HTTP/1.1
+Authorization: Bearer {{access_token}}
+

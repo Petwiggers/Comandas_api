@@ -3,6 +3,7 @@ from settings import HOST, PORT, RELOAD
 import uvicorn
 # import das classes com as rotas/endpoints
 from routers import FuncionarioRouter
+from routers import AuthRouter
 from routers import ClienteRouter
 from routers import ProdutoRouter
 # lifespan - ciclo de vida da aplicação
@@ -29,6 +30,7 @@ async def root():
     # incluir as rotas/endpoints no FastAPI
     
 app.include_router(FuncionarioRouter.router)
+app.include_router(AuthRouter.router)
 app.include_router(ClienteRouter.router)
 app.include_router(ProdutoRouter.router)
     
