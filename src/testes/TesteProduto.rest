@@ -1,17 +1,22 @@
 #Peterson Wiggers
+@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTExMTExMTExMSIsImlkIjoyLCJncnVwbyI6MSwiZXhwIjoxNzc0NzMzODY2LCJ0eXBlIjoiYWNjZXNzIn0.3L3LwnWzYSHEJ-Ipnh4U4clc_Th6RqL3WqdxL_5BDLY
 ### Verbo GET – listar todos
 GET http://localhost:8000/produto/ HTTP/1.1
+Authorization: Bearer {{access_token}}
 
 ### Verbo GET – listar todos Sem Id e Valor
 GET http://localhost:8000/produtoSemId_Valor/ HTTP/1.1
 ### Verbo GET – listar um
 GET http://localhost:8000/produto/1 HTTP/1.1
+Authorization: Bearer {{access_token}}
+
 ### Verbo POST – adicionar
 POST http://127.0.0.1:8000/produto/ HTTP/1.1
+Authorization: Bearer {{access_token}}
 Content-Type: application/json
 
 {
-  "nome": "Camiseta Básica 5",
+  "nome": "Camiseta Básica 6",
   "descricao": "Camiseta de algodão manga curta",
   "foto": "iVBORw0KGgoAAAANSUhEUgAA...",
   "valor_unitario": 49.90
@@ -19,6 +24,7 @@ Content-Type: application/json
 
 ### Verbo PUT – atualiza
 PUT http://127.0.0.1:8000/produto/1 HTTP/1.1
+Authorization: Bearer {{access_token}}
 Content-Type: application/json
 
 {
@@ -30,3 +36,4 @@ Content-Type: application/json
 
 ### Verbo DELETE - excluir
 DELETE http://127.0.0.1:8000/produto/1 HTTP/1.1
+Authorization: Bearer {{access_token}}

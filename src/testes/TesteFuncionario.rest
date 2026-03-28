@@ -1,10 +1,14 @@
 #Peterson Wiggers
+@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTExMTExMTExMSIsImlkIjoyLCJncnVwbyI6MSwiZXhwIjoxNzc0NzMzODY2LCJ0eXBlIjoiYWNjZXNzIn0.3L3LwnWzYSHEJ-Ipnh4U4clc_Th6RqL3WqdxL_5BDLY
 ### Verbo GET – listar todos
 GET http://localhost:8000/funcionario/ HTTP/1.1
+Authorization: Bearer {{access_token}}
 ### Verbo GET – listar um
 GET http://localhost:8000/funcionario/1 HTTP/1.1
+Authorization: Bearer {{access_token}}
 ### Verbo POST – adicionar
 POST http://127.0.0.1:8000/funcionario/ HTTP/1.1
+Authorization: Bearer {{access_token}}
 Content-Type: application/json
 
 {
@@ -18,6 +22,7 @@ Content-Type: application/json
 
 ### POST – adicionar Deja Wiggers
 POST http://127.0.0.1:8000/funcionario/ HTTP/1.1
+Authorization: Bearer {{access_token}}
 Content-Type: application/json
 
 {
@@ -31,6 +36,7 @@ Content-Type: application/json
 
 ### POST – adicionar Alisson Wiggers
 POST http://127.0.0.1:8000/funcionario/ HTTP/1.1
+Authorization: Bearer {{access_token}}
 Content-Type: application/json
 
 {
@@ -44,6 +50,7 @@ Content-Type: application/json
 
 ### POST – adicionar Fernanda Bergmeier
 POST http://127.0.0.1:8000/funcionario/ HTTP/1.1
+Authorization: Bearer {{access_token}}
 Content-Type: application/json
 
 {
@@ -55,9 +62,24 @@ Content-Type: application/json
   "senha": "senha123"
 }
 
+### POST – adicionar Fernanda Bergmeier
+POST http://127.0.0.1:8000/funcionario/ HTTP/1.1
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "nome": "Zé das Batatas",
+  "matricula": "MAT2026001",
+  "cpf": "11111111111",
+  "telefone": "49999998888",
+  "grupo": 3,
+  "senha": "senha123"
+}
+
 
 ### Verbo PUT – atualiza
 PUT http://127.0.0.1:8000/funcionario/1 HTTP/1.1
+Authorization: Bearer {{access_token}}
 Content-Type: application/json
 
 {
@@ -71,3 +93,4 @@ Content-Type: application/json
 
 ### Verbo DELETE - excluir
 DELETE http://127.0.0.1:8000/funcionario/1 HTTP/1.1
+Authorization: Bearer {{access_token}}
