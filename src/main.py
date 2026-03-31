@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from settings import HOST, PORT, RELOAD
+from settings import HOST, PORT, RELOAD 
+from infra.rate_limit import limiter, rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 import uvicorn
 # import das classes com as rotas/endpoints
 from routers import FuncionarioRouter
@@ -21,6 +24,11 @@ async def lifespan(app: FastAPI):
     print("API is shutting down")
     # cria a aplicação FastAPI com o contexto de vida
 app = FastAPI(lifespan=lifespan)
+
+#app = FastAPI() # Configuração de Rate Limiting
+app.state.limiter = limiter
+# Registrar handler personalizado ANTES de incluir rotas
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # rota padrão
 @app.get("/", tags=["Root"], status_code=200)
