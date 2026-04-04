@@ -17,6 +17,7 @@ from infra.security import (
     verify_refresh_token,
 )
 from infra.dependencies import get_current_active_user
+from infra.rate_limit import get_rate_limit, limiter 
 from settings import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 
 router = APIRouter()
@@ -28,6 +29,7 @@ router = APIRouter()
     tags=["Autenticação"],
     summary="Login de funcionário - pública - retorna access e refresh token",
 )
+@limiter.limit(get_rate_limit("critical"))
 async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     """Realiza login do funcionário e retorna access token e refresh token."""
     try:
@@ -91,6 +93,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     tags=["Autenticação"],
     summary="Refresh token - pública - renova access token",
 )
+@limiter.limit(get_rate_limit("critical"))
 async def refresh_token(refresh_data: RefreshTokenRequest, db: Session = Depends(get_db)):
     """Renova o access token usando um refresh token válido."""
     try:
@@ -145,6 +148,7 @@ async def refresh_token(refresh_data: RefreshTokenRequest, db: Session = Depends
         )
         
 @router.get("/auth/me", response_model=FuncionarioAuth, tags=["Autenticação"], summary="Dados do usuário atual - protegida por autenticação")
+@limiter.limit(get_rate_limit("moderate"))
 async def get_current_user_info(current_user: FuncionarioAuth = Depends(get_current_active_user)):
     """
     Retorna informações do usuário autenticado atual
@@ -153,6 +157,7 @@ async def get_current_user_info(current_user: FuncionarioAuth = Depends(get_curr
     return current_user
 
 @router.post("/auth/logout", tags=["Autenticação"], summary="Logout - pública")
+@limiter.limit(get_rate_limit("moderate"))
 async def logout():
     """
     Endpoint para logout (client-side)

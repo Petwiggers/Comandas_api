@@ -18,11 +18,13 @@ from domain.schemas.AuthSchema import FuncionarioAuth
 from infra.orm.ProdutoModel import ProdutoDB
 from infra.database import get_db
 from infra.dependencies import get_current_active_user, require_group
+from infra.rate_limit import get_rate_limit, limiter 
 
 
 router = APIRouter()
 # Criar as rotas/endpoints: GET, POST, PUT, DELETE
 @router.get("/produto/",response_model=List[ProdutoResponse], tags=["Produto"], status_code=status.HTTP_200_OK)
+@limiter.limit(get_rate_limit("moderate"))
 async def get_produto(
     db: Session = Depends(get_db),
     current_user: FuncionarioAuth = Depends(get_current_active_user)):
@@ -38,6 +40,7 @@ async def get_produto(
         )
         
 @router.get("/produtoSemId_Valor/",response_model=List[ProdutoResponseSemId_Valor], tags=["Produto"], status_code=status.HTTP_200_OK)
+@limiter.limit(get_rate_limit("moderate"))
 async def get_produto(db: Session = Depends(get_db)):
     """Retorna todos os Produtos"""
     try:
@@ -51,6 +54,7 @@ async def get_produto(db: Session = Depends(get_db)):
 
 
 @router.get("/produto/{id}", response_model=ProdutoResponse, tags=["Produto"], status_code=status.HTTP_200_OK)
+@limiter.limit(get_rate_limit("moderate"))
 async def get_produto(
     id: int, 
     db: Session = Depends(get_db),
@@ -74,6 +78,7 @@ async def get_produto(
 
 
 @router.post("/produto/", response_model=ProdutoResponse, tags=["Produto"], status_code=status.HTTP_201_CREATED)
+@limiter.limit(get_rate_limit("restrictive"))
 async def post_produto(
     produto_data: ProdutoCreate,
     db: Session = Depends(get_db),
@@ -108,6 +113,7 @@ async def post_produto(
         )
 
 @router.put("/produto/{id}", response_model=ProdutoResponse, tags=["Produto"], status_code=status.HTTP_200_OK)
+@limiter.limit(get_rate_limit("restrictive"))
 async def put_produto(
     id: int,
     produto_data: ProdutoUpdate,
@@ -150,6 +156,7 @@ async def put_produto(
         )
 
 @router.delete("/produto/{id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Produto"], summary="Remover produto")
+@limiter.limit(get_rate_limit("critical"))
 async def delete_produto(
     id: int,
     db: Session = Depends(get_db),

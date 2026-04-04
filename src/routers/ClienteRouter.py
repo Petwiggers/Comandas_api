@@ -15,11 +15,13 @@ from domain.schemas.AuthSchema import FuncionarioAuth
 from infra.dependencies import get_current_active_user, require_group
 from infra.orm.ClienteModel import ClienteDB
 from infra.database import get_db
+from infra.rate_limit import get_rate_limit, limiter 
 
 router = APIRouter()
 
 # Criar as rotas/endpoints: GET, POST, PUT, DELETE
 @router.get("/cliente/", response_model=List[ClienteResponse], tags=["Cliente"], status_code=status.HTTP_200_OK)
+@limiter.limit(get_rate_limit("moderate"))
 async def get_cliente(
     db: Session = Depends(get_db),
     current_user: FuncionarioAuth = Depends(get_current_active_user)):
@@ -35,6 +37,7 @@ async def get_cliente(
 
 
 @router.get("/cliente/{id}", response_model=ClienteResponse, tags=["Cliente"], status_code=status.HTTP_200_OK)
+@limiter.limit(get_rate_limit("moderate"))
 async def get_cliente(
     id: int, 
     db: Session = Depends(get_db),
@@ -55,6 +58,7 @@ async def get_cliente(
         )
 
 @router.post("/cliente/", response_model=ClienteResponse, tags=["Cliente"], status_code=status.HTTP_201_CREATED)
+@limiter.limit(get_rate_limit("restrictive"))
 async def post_cliente(
     cliente_data: ClienteCreate,
     db: Session = Depends(get_db),
@@ -88,6 +92,7 @@ async def post_cliente(
         )
 
 @router.put("/cliente/{id}", response_model=ClienteResponse, tags=["Cliente"], status_code=status.HTTP_200_OK)
+@limiter.limit(get_rate_limit("restrictive"))
 async def put_cliente(
     id: int,
     cliente_data: ClienteUpdate,
@@ -126,6 +131,7 @@ async def put_cliente(
         )
 
 @router.delete("/cliente/{id}", tags=["Cliente"], status_code=status.HTTP_204_NO_CONTENT, summary="Remover cliente")
+@limiter.limit(get_rate_limit("critical"))
 async def delete_cliente(
     id: int,
     db: Session = Depends(get_db),

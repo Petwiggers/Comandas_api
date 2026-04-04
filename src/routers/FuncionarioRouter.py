@@ -42,6 +42,7 @@ async def get_funcionario(
         )
 
 @router.get("/funcionario/{id}", response_model=FuncionarioResponse, tags=["Funcionário"], status_code=status.HTTP_200_OK)
+@limiter.limit(get_rate_limit("moderate"))
 async def get_funcionario(
     id: int,
     db: Session = Depends(get_db),
@@ -62,6 +63,7 @@ async def get_funcionario(
         )
 
 @router.post("/funcionario/", response_model=FuncionarioResponse, status_code=status.HTTP_201_CREATED, tags=["Funcionário"])
+@limiter.limit(get_rate_limit("restrictive"))
 async def post_funcionario(
     funcionario_data: FuncionarioCreate,
     db: Session = Depends(get_db),
@@ -98,6 +100,7 @@ async def post_funcionario(
         )
 
 @router.put("/funcionario/{id}", response_model=FuncionarioResponse, tags=["Funcionário"], status_code=status.HTTP_200_OK)
+@limiter.limit(get_rate_limit("restrictive"))
 async def put_funcionario(
     id: int,
     funcionario_data: FuncionarioUpdate,
