@@ -1,5 +1,5 @@
 #Peterson Wiggers
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -23,6 +23,7 @@ router = APIRouter()
 @router.get("/cliente/", response_model=List[ClienteResponse], tags=["Cliente"], status_code=status.HTTP_200_OK)
 @limiter.limit(get_rate_limit("moderate"))
 async def get_cliente(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: FuncionarioAuth = Depends(get_current_active_user)):
     """Retorna todos os clientes"""
@@ -39,6 +40,7 @@ async def get_cliente(
 @router.get("/cliente/{id}", response_model=ClienteResponse, tags=["Cliente"], status_code=status.HTTP_200_OK)
 @limiter.limit(get_rate_limit("moderate"))
 async def get_cliente(
+    request: Request,
     id: int, 
     db: Session = Depends(get_db),
     current_user: FuncionarioAuth = Depends(get_current_active_user)):
@@ -60,6 +62,7 @@ async def get_cliente(
 @router.post("/cliente/", response_model=ClienteResponse, tags=["Cliente"], status_code=status.HTTP_201_CREATED)
 @limiter.limit(get_rate_limit("restrictive"))
 async def post_cliente(
+    request: Request,
     cliente_data: ClienteCreate,
     db: Session = Depends(get_db),
     current_user: FuncionarioAuth = Depends(require_group([1,3]))):
@@ -94,6 +97,7 @@ async def post_cliente(
 @router.put("/cliente/{id}", response_model=ClienteResponse, tags=["Cliente"], status_code=status.HTTP_200_OK)
 @limiter.limit(get_rate_limit("restrictive"))
 async def put_cliente(
+    request: Request,
     id: int,
     cliente_data: ClienteUpdate,
     db: Session = Depends(get_db),
@@ -133,6 +137,7 @@ async def put_cliente(
 @router.delete("/cliente/{id}", tags=["Cliente"], status_code=status.HTTP_204_NO_CONTENT, summary="Remover cliente")
 @limiter.limit(get_rate_limit("critical"))
 async def delete_cliente(
+    request: Request,
     id: int,
     db: Session = Depends(get_db),
     current_user: FuncionarioAuth = Depends(require_group([1]))):

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
@@ -30,7 +30,7 @@ router = APIRouter()
     summary="Login de funcionário - pública - retorna access e refresh token",
 )
 @limiter.limit(get_rate_limit("critical"))
-async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+async def login(request: Request, login_data: LoginRequest, db: Session = Depends(get_db)):
     """Realiza login do funcionário e retorna access token e refresh token."""
     try:
         funcionario = (
@@ -94,7 +94,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     summary="Refresh token - pública - renova access token",
 )
 @limiter.limit(get_rate_limit("critical"))
-async def refresh_token(refresh_data: RefreshTokenRequest, db: Session = Depends(get_db)):
+async def refresh_token(request: Request, refresh_data: RefreshTokenRequest, db: Session = Depends(get_db)):
     """Renova o access token usando um refresh token válido."""
     try:
         payload = verify_refresh_token(refresh_data.refresh_token)
@@ -149,7 +149,7 @@ async def refresh_token(refresh_data: RefreshTokenRequest, db: Session = Depends
         
 @router.get("/auth/me", response_model=FuncionarioAuth, tags=["Autenticação"], summary="Dados do usuário atual - protegida por autenticação")
 @limiter.limit(get_rate_limit("moderate"))
-async def get_current_user_info(current_user: FuncionarioAuth = Depends(get_current_active_user)):
+async def get_current_user_info(request: Request,current_user: FuncionarioAuth = Depends(get_current_active_user)):
     """
     Retorna informações do usuário autenticado atual
     Requer header: Authorization: Bearer <access_token>
@@ -158,7 +158,7 @@ async def get_current_user_info(current_user: FuncionarioAuth = Depends(get_curr
 
 @router.post("/auth/logout", tags=["Autenticação"], summary="Logout - pública")
 @limiter.limit(get_rate_limit("moderate"))
-async def logout():
+async def logout(request: Request):
     """
     Endpoint para logout (client-side)
     Na prática, o logout é implementado no cliente removendo os tokens
