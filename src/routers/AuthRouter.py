@@ -18,6 +18,7 @@ from infra.security import (
 )
 from infra.dependencies import get_current_active_user
 from infra.rate_limit import get_rate_limit, limiter 
+from services.AuditoriaService import AuditoriaService
 from settings import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 
 router = APIRouter()
@@ -58,18 +59,27 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
             data={
                 "sub": funcionario.cpf,
                 "id": funcionario.id,
-                "grupo": funcionario.grupo,
+                "grupo": funcionario.grupo
             },
-            expires_delta=access_token_expires,
+            expires_delta=access_token_expires
         )
 
         refresh_token = create_refresh_token(
             data={
                 "sub": funcionario.cpf,
                 "id": funcionario.id,
-                "grupo": funcionario.grupo,
+                "grupo": funcionario.grupo
             }
         )
+        
+        # Registrar auditoria de login
+        AuditoriaService.registrar_acao(
+            db=db,
+            funcionario_id=funcionario.id,
+            acao="LOGIN",
+            recurso="AUTH",
+            request=request
+            )
 
         return TokenResponse(
             access_token=access_token,

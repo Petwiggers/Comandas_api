@@ -1,5 +1,6 @@
 #Peterson Wiggers
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import asc
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -10,6 +11,7 @@ ClienteUpdate,
 ClienteResponse
 )
 from domain.schemas.AuthSchema import FuncionarioAuth
+from services.AuditoriaService import AuditoriaService
 
 # Infra
 from infra.dependencies import get_current_active_user, require_group
@@ -25,10 +27,20 @@ router = APIRouter()
 async def get_cliente(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: FuncionarioAuth = Depends(get_current_active_user)):
+    current_user: FuncionarioAuth = Depends(get_current_active_user),
+    skip: int = Query(0, ge=0, description="Número de registros para pular"),
+    limite: int = Query(
+        100, ge=1, le=1000, description="Limite de registros"
+    ),):
     """Retorna todos os clientes"""
     try:
-        clientes = db.query(ClienteDB).all()
+        clientes = (
+            db.query(ClienteDB)
+            .order_by(asc(ClienteDB.id))
+            .offset(skip)
+            .limit(limite)
+            .all()
+        )
         return clientes
     except Exception as e:
         raise HTTPException(
@@ -43,7 +55,7 @@ async def get_cliente(
     request: Request,
     id: int, 
     db: Session = Depends(get_db),
-    current_user: FuncionarioAuth = Depends(get_current_active_user)):
+    current_user: FuncionarioAuth = Depends(get_current_active_user),):
     
     """Retorna um cliente específico pelo ID"""
     try:
@@ -85,6 +97,16 @@ async def post_cliente(
         db.add(novo_cliente)
         db.commit()
         db.refresh(novo_cliente)
+        AuditoriaService.registrar_acao(
+            db=db,
+            funcionario_id=current_user.id,
+            acao="CREATE",
+            recurso="CLIENTE",
+            recurso_id=novo_cliente.id,
+            dados_antigos=None,
+            dados_novos=novo_cliente, # Objeto SQLAlchemy com dados novos
+            request=request # Request completo para capturar IP e user agent
+            )
         return novo_cliente
     except HTTPException:
         raise
@@ -120,11 +142,21 @@ async def put_cliente(
                 )
             
         # Atualiza apenas os campos fornecidos
+        dados_antigos_obj = cliente.__dict__.copy()
         update_data = cliente_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(cliente, field, value)
         db.commit()
         db.refresh(cliente)
+        AuditoriaService.registrar_acao(
+            db=db,
+            funcionario_id=current_user.id,
+            acao="UPDATE",
+            recurso="CLIENTE",
+            recurso_id=cliente.id,
+            dados_antigos=dados_antigos_obj,
+            dados_novos=cliente,
+        )
         return cliente
     except HTTPException:
         raise
@@ -151,6 +183,16 @@ async def delete_cliente(
             )
         db.delete(cliente)
         db.commit()
+        AuditoriaService.registrar_acao(
+            db=db,
+            funcionario_id=current_user.id,
+            acao="DELETE",
+            recurso="CLIENTE",
+            recurso_id=cliente.id,
+            dados_antigos=cliente,
+            dados_novos=None,
+            request=request
+            )
         return None
     except HTTPException:
         raise

@@ -1,7 +1,8 @@
 #Peterson Wiggers
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from typing import List
+from services.AuditoriaService import AuditoriaService
 
 # Domain Schemas
 from domain.schemas.FuncionarioSchema import (
@@ -28,12 +29,20 @@ router = APIRouter()
 async def get_funcionario(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: FuncionarioAuth = Depends(require_group([1]))
-    ):
+    current_user: FuncionarioAuth = Depends(require_group([1])),
+    skip: int = Query(0, ge=0, description="Número de registros para pular"),
+    limite: int = Query(
+        100, ge=1, le=1000, description="Limite de registros"
+    )):
     
     """Retorna todos os funcionários"""
     try:
-        funcionarios = db.query(FuncionarioDB).all()
+        funcionarios = (
+            db.query(FuncionarioDB)
+            .offset(skip)
+            .limit(limite)
+            .all()
+        )
         return funcionarios
     except Exception as e:
         raise HTTPException(
@@ -92,6 +101,18 @@ async def post_funcionario(
         db.add(novo_funcionario)
         db.commit()
         db.refresh(novo_funcionario)
+        
+        # Depois de tudo executado e antes do return, registra a ação na auditoria
+        AuditoriaService.registrar_acao(
+            db=db,
+            funcionario_id=current_user.id,
+            acao="CREATE",
+            recurso="FUNCIONARIO",
+            recurso_id=novo_funcionario.id,
+            dados_antigos=None,
+            dados_novos=novo_funcionario, # Objeto SQLAlchemy com dados novos
+            request=request # Request completo para capturar IP e user agent
+            )
         return novo_funcionario
     except HTTPException:
         raise
@@ -130,12 +151,25 @@ async def put_funcionario(
         if funcionario_data.senha:
             funcionario_data.senha = get_password_hash(funcionario_data.senha)
             
+        dados_antigos_obj = funcionario.__dict__.copy()
         # Atualiza apenas os campos fornecidos
         update_data = funcionario_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(funcionario, field, value)
         db.commit()
         db.refresh(funcionario)    
+        
+        # Depois de tudo executado e antes do return, registra a ação na auditoria
+        AuditoriaService.registrar_acao(
+            db=db,
+            funcionario_id=current_user.id,
+            acao="UPDATE",
+            recurso="FUNCIONARIO",
+            recurso_id=funcionario.id,
+            dados_antigos=dados_antigos_obj, # Objeto SQLAlchemy com dados antigos
+            dados_novos=funcionario, # Objeto SQLAlchemy com dados novos
+            request=request # Request completo para capturar IP e user agent
+            )
         return funcionario
         
     except HTTPException:
@@ -164,6 +198,18 @@ async def delete_funcionario(
             )
         db.delete(funcionario)
         db.commit()
+        # Depois de tudo executado e antes do return, registra a ação na auditoria
+        AuditoriaService.registrar_acao(
+            db=db,
+            funcionario_id=current_user.id,
+            acao="DELETE",
+            recurso="FUNCIONARIO",
+            recurso_id=funcionario.id,
+            dados_antigos=funcionario,
+            dados_novos=None,
+            request=request
+            )
+        
         return None
     except HTTPException:
         raise

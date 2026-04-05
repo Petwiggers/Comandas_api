@@ -1,5 +1,5 @@
 #Peterson Wiggers
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -13,6 +13,7 @@ from domain.schemas.ProdutoSchema import (
     ProdutoResponseSemId_Valor
     )
 from domain.schemas.AuthSchema import FuncionarioAuth
+from services.AuditoriaService import AuditoriaService
 
 # Infra
 from infra.orm.ProdutoModel import ProdutoDB
@@ -28,11 +29,20 @@ router = APIRouter()
 async def get_produto(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: FuncionarioAuth = Depends(get_current_active_user)):
+    current_user: FuncionarioAuth = Depends(get_current_active_user),
+    skip: int = Query(0, ge=0, description="Número de registros para pular"),
+    limite: int = Query(
+        100, ge=1, le=1000, description="Limite de registros"
+    )):
     
     """Retorna todos os Produtos"""
     try:
-        produtos = db.query(ProdutoDB).all()
+        produtos = (
+            db.query(ProdutoDB)
+            .offset(skip)
+            .limit(limite)
+            .all()
+        )
         return produtos
     except Exception as e:
         raise HTTPException(
@@ -106,13 +116,23 @@ async def post_produto(
         db.add(novo_produto)
         db.commit()
         db.refresh(novo_produto)
+        AuditoriaService.registrar_acao(
+            db=db,
+            funcionario_id=current_user.id,
+            acao="CREATE",
+            recurso="PRODUTO",
+            recurso_id=novo_produto.id,
+            dados_antigos=None,
+            dados_novos=novo_produto, # Objeto SQLAlchemy com dados novos
+            request=request # Request completo para capturar IP e user agent
+            )
         return novo_produto
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro ao criar funcionário: {str(e)}"
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro ao criar produto: {str(e)}"
         )
 
 @router.put("/produto/{id}", response_model=ProdutoResponse, tags=["Produto"], status_code=status.HTTP_200_OK)
@@ -140,7 +160,7 @@ async def put_produto(
                 raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Já existe um produto com este nome"
                 )
-            
+        dados_antigos_obj = produto.__dict__.copy()
         update_data = produto_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             print('\n')
@@ -149,6 +169,15 @@ async def put_produto(
             setattr(produto, field, value)
         db.commit()
         db.refresh(produto)
+        AuditoriaService.registrar_acao(
+            db=db,
+            funcionario_id=current_user.id,
+            acao="UPDATE",
+            recurso="PRODUTO",
+            recurso_id=produto.id,
+            dados_antigos=dados_antigos_obj,
+            dados_novos=produto
+        )
         return produto
         
     except HTTPException:
@@ -176,6 +205,16 @@ async def delete_produto(
             )
         db.delete(produto)
         db.commit()
+        AuditoriaService.registrar_acao(
+            db=db,
+            funcionario_id=current_user.id,
+            acao="DELETE",
+            recurso="PRODUTO",
+            recurso_id=produto.id,
+            dados_antigos=produto,
+            dados_novos=None,
+            request=request
+            )
         return None
     except HTTPException:
         raise
