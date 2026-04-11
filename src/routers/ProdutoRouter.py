@@ -52,10 +52,20 @@ async def get_produto(
         
 @router.get("/produtoSemId_Valor/",response_model=List[ProdutoResponseSemId_Valor], tags=["Produto"], status_code=status.HTTP_200_OK)
 @limiter.limit(get_rate_limit("moderate"))
-async def get_produto(request: Request,db: Session = Depends(get_db)):
+async def get_produto(
+    request: Request,
+    db: Session = Depends(get_db),
+    skip: int = Query(0, ge=0, description="Número de registros para pular"),
+    limite: int = Query(
+        100, ge=1, le=1000, description="Limite de registros"
+    )):
     """Retorna todos os Produtos"""
     try:
-        produtos = db.query(ProdutoDB).all()
+        produtos = (db.query(ProdutoDB)
+            .offset(skip)
+            .limit(limite)
+            .all()
+        )
         return produtos
     except Exception as e:
         raise HTTPException(

@@ -1,5 +1,6 @@
 #Peterson Wiggers
 from infra import database
+from fastapi import HTTPException, status
 from sqlalchemy import Column, VARCHAR, CHAR, Integer
 
 # ORM
@@ -11,6 +12,8 @@ class ClienteDB(database.Base):
     telefone = Column(CHAR(11), nullable=False)
     def __init__(self, id, nome, cpf, telefone):
         self.id = id
+        if(nome == None or nome.strip() == ""):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O nome do cliente é obrigatório.");
         self.nome = nome
         self.cpf = cpf
         self.telefone = telefone

@@ -1,5 +1,5 @@
 #Peterson Wiggers
-@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTExMTExMTExMSIsImlkIjoyLCJncnVwbyI6MSwiZXhwIjoxNzc0NzMzODY2LCJ0eXBlIjoiYWNjZXNzIn0.3L3LwnWzYSHEJ-Ipnh4U4clc_Th6RqL3WqdxL_5BDLY
+@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWQiOjEsImdydXBvIjoxLCJleHAiOjE3NzU5NDAzNjIsInR5cGUiOiJhY2Nlc3MifQ.f1E4jj5CQs5qZsD2O8ca7gz2o9IsN_zBqM_5OjvCWUc
 
 ### Verbo GET – listar todos
 GET http://localhost:8000/cliente/ HTTP/1.1

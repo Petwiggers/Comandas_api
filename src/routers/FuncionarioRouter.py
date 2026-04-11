@@ -1,7 +1,7 @@
 #Peterson Wiggers
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from services.AuditoriaService import AuditoriaService
 
 # Domain Schemas
@@ -23,31 +23,60 @@ from slowapi.errors import RateLimitExceeded
 
 router = APIRouter()
 
-# Criar as rotas/endpoints: GET, POST, PUT, DELETE
-@router.get("/funcionario/", response_model=List[FuncionarioResponse], tags=["Funcionário"], status_code=status.HTTP_200_OK)
+@router.get(
+    "/funcionario/",
+    response_model=List[FuncionarioResponse],
+    tags=["Funcionário"],
+    status_code=status.HTTP_200_OK,
+    summary="Listar todos os funcionários - protegida por JWT e grupo 1",
+)
 @limiter.limit(get_rate_limit("moderate"))
 async def get_funcionario(
     request: Request,
+    skip: int = Query(0, ge=0, description="Número de registros para pular"),
+    limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros"),
+    id: Optional[int] = Query(None, description="Filtrar por ID"),
+    nome: Optional[str] = Query(None, description="Filtrar por nome"),
+    matricula: Optional[str] = Query(None, description="Filtrar por matrícula"),
+    cpf: Optional[str] = Query(None, description="Filtrar por CPF"),
+    grupo: Optional[str] = Query(
+        None,
+        description="Filtrar por grupo: 1=Admin, 2=Balcão, 3=Caixa - Separar por vírgula",
+    ),
+    telefone: Optional[str] = Query(None, description="Filtrar por telefone"),
     db: Session = Depends(get_db),
     current_user: FuncionarioAuth = Depends(require_group([1])),
-    skip: int = Query(0, ge=0, description="Número de registros para pular"),
-    limite: int = Query(
-        100, ge=1, le=1000, description="Limite de registros"
-    )):
-    
-    """Retorna todos os funcionários"""
+):
     try:
-        funcionarios = (
-            db.query(FuncionarioDB)
-            .offset(skip)
-            .limit(limite)
-            .all()
-        )
+        query = db.query(FuncionarioDB)
+
+        # Aplicar filtros
+        if id is not None:
+            query = query.filter(FuncionarioDB.id == id)
+        if nome is not None:
+            query = query.filter(FuncionarioDB.nome.ilike(f"%{nome}%"))  # ilike = case insensitive
+        if matricula is not None:
+            query = query.filter(FuncionarioDB.matricula == matricula)
+        if cpf is not None:
+            query = query.filter(FuncionarioDB.cpf == cpf)
+        if grupo is not None:
+            # Converter string separada por vírgula para lista de inteiros
+            grupos_list = [int(g.strip()) for g in grupo.split(',') if g.strip().isdigit()]
+            query = query.filter(FuncionarioDB.grupo.in_(grupos_list))
+        if telefone is not None:
+            query = query.filter(FuncionarioDB.telefone.ilike(f"%{telefone}%"))
+
+        # Aplicar paginação
+        funcionarios = query.offset(skip).limit(limit).all()
         return funcionarios
+    except RateLimitExceeded:
+        # Propagar exceção original para o handler personalizado
+        raise
     except Exception as e:
+        # Apenas erros reais da aplicação (não rate limit)
         raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail=f"Erro ao buscar funcionários: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar funcionários: {str(e)}",
         )
 
 @router.get("/funcionario/{id}", response_model=FuncionarioResponse, tags=["Funcionário"], status_code=status.HTTP_200_OK)
