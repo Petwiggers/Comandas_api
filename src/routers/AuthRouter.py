@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from datetime import timedelta
 
 from domain.schemas.AuthSchema import (
@@ -9,7 +10,7 @@ from domain.schemas.AuthSchema import (
     FuncionarioAuth,
 )
 from infra.orm.FuncionarioModel import FuncionarioDB
-from infra.database import get_db
+from infra.database import get_async_db
 from infra.security import (
     verify_password,
     create_access_token,
@@ -31,14 +32,11 @@ router = APIRouter()
     summary="Login de funcionário - pública - retorna access e refresh token",
 )
 @limiter.limit(get_rate_limit("critical"))
-async def login(request: Request, login_data: LoginRequest, db: Session = Depends(get_db)):
+async def login(request: Request, login_data: LoginRequest, db: AsyncSession = Depends(get_async_db)):
     """Realiza login do funcionário e retorna access token e refresh token."""
     try:
-        funcionario = (
-            db.query(FuncionarioDB)
-            .filter(FuncionarioDB.cpf == login_data.cpf)
-            .first()
-        )
+        result = await db.execute(select(FuncionarioDB).where(FuncionarioDB.cpf == login_data.cpf))
+        funcionario = result.scalar_one_or_none()
 
         if not funcionario:
             raise HTTPException(
@@ -104,16 +102,13 @@ async def login(request: Request, login_data: LoginRequest, db: Session = Depend
     summary="Refresh token - pública - renova access token",
 )
 @limiter.limit(get_rate_limit("critical"))
-async def refresh_token(request: Request, refresh_data: RefreshTokenRequest, db: Session = Depends(get_db)):
+async def refresh_token(request: Request, refresh_data: RefreshTokenRequest, db: AsyncSession = Depends(get_async_db)):
     """Renova o access token usando um refresh token válido."""
     try:
         payload = verify_refresh_token(refresh_data.refresh_token)
         cpf = payload.get("sub")
-        funcionario = (
-            db.query(FuncionarioDB)
-            .filter(FuncionarioDB.cpf == cpf)
-            .first()
-        )
+        result = await db.execute(select(FuncionarioDB).where(FuncionarioDB.cpf == cpf))
+        funcionario = result.scalar_one_or_none()
 
         if not funcionario:
             raise HTTPException(

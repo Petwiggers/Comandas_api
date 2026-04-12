@@ -1,6 +1,7 @@
 #Peterson Wiggers
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from typing import List, Optional
 from services.AuditoriaService import AuditoriaService
 
@@ -14,7 +15,7 @@ from domain.schemas.AuthSchema import FuncionarioAuth
 
 # Infra
 from infra.orm.FuncionarioModel import FuncionarioDB
-from infra.database import get_db
+from infra.database import get_async_db
 from infra.security import get_password_hash
 from infra.dependencies import get_current_active_user, require_group
 from infra.rate_limit import get_rate_limit, limiter 
@@ -44,30 +45,31 @@ async def get_funcionario(
         description="Filtrar por grupo: 1=Admin, 2=Balcão, 3=Caixa - Separar por vírgula",
     ),
     telefone: Optional[str] = Query(None, description="Filtrar por telefone"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(require_group([1])),
 ):
     try:
-        query = db.query(FuncionarioDB)
-
+        query = select(FuncionarioDB)
+        
         # Aplicar filtros
         if id is not None:
-            query = query.filter(FuncionarioDB.id == id)
+            query = query.where(FuncionarioDB.id == id)
         if nome is not None:
-            query = query.filter(FuncionarioDB.nome.ilike(f"%{nome}%"))  # ilike = case insensitive
+            query = query.where(FuncionarioDB.nome.ilike(f"%{nome}%"))  # ilike = case insensitive
         if matricula is not None:
-            query = query.filter(FuncionarioDB.matricula == matricula)
+            query = query.where(FuncionarioDB.matricula == matricula)
         if cpf is not None:
-            query = query.filter(FuncionarioDB.cpf == cpf)
+            query = query.where(FuncionarioDB.cpf == cpf)
         if grupo is not None:
             # Converter string separada por vírgula para lista de inteiros
             grupos_list = [int(g.strip()) for g in grupo.split(',') if g.strip().isdigit()]
-            query = query.filter(FuncionarioDB.grupo.in_(grupos_list))
+            query = query.where(FuncionarioDB.grupo.in_(grupos_list))
         if telefone is not None:
-            query = query.filter(FuncionarioDB.telefone.ilike(f"%{telefone}%"))
+            query = query.where(FuncionarioDB.telefone.ilike(f"%{telefone}%"))
 
         # Aplicar paginação
-        funcionarios = query.offset(skip).limit(limit).all()
+        result = await db.execute(query.offset(skip).limit(limit))
+        funcionarios = result.scalars().all()
         return funcionarios
     except RateLimitExceeded:
         # Propagar exceção original para o handler personalizado
@@ -84,12 +86,13 @@ async def get_funcionario(
 async def get_funcionario(
     request: Request,
     id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(get_current_active_user)):
     
     """Retorna um funcionário específico pelo ID"""
     try:
-        funcionario = db.query(FuncionarioDB).filter(FuncionarioDB.id == id).first()
+        result = await db.execute(select(FuncionarioDB).where(FuncionarioDB.id == id))
+        funcionario = result.scalar_one_or_none()
         if not funcionario:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funcionário não encontrado")
         return funcionario
@@ -106,13 +109,14 @@ async def get_funcionario(
 async def post_funcionario(
     request: Request,
     funcionario_data: FuncionarioCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(require_group([1]))):
     
     """Cria um novo funcionário"""
     try:
         # Verifica se já existe funcionário com este CPF
-        existing_funcionario = db.query(FuncionarioDB).filter(FuncionarioDB.cpf == funcionario_data.cpf).first()
+        result = await db.execute(select(FuncionarioDB).where(FuncionarioDB.cpf == funcionario_data.cpf))
+        existing_funcionario = result.scalar_one_or_none()
         if existing_funcionario:
             raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Já existe um funcionário com este CPF"
@@ -128,11 +132,11 @@ async def post_funcionario(
         senha=get_password_hash(funcionario_data.senha)
         )
         db.add(novo_funcionario)
-        db.commit()
-        db.refresh(novo_funcionario)
+        await db.commit()
+        await db.refresh(novo_funcionario)
         
         # Depois de tudo executado e antes do return, registra a ação na auditoria
-        AuditoriaService.registrar_acao(
+        await AuditoriaService.registrar_acao(
             db=db,
             funcionario_id=current_user.id,
             acao="CREATE",
@@ -146,7 +150,7 @@ async def post_funcionario(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro ao criar funcionário: {str(e)}"
         )
@@ -157,12 +161,13 @@ async def put_funcionario(
     request: Request,
     id: int,
     funcionario_data: FuncionarioUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(require_group([1]))):
     
     """Atualiza um funcionário existente"""
     try:
-        funcionario = db.query(FuncionarioDB).filter(FuncionarioDB.id == id).first()
+        result = await db.execute(select(FuncionarioDB).where(FuncionarioDB.id == id))
+        funcionario = result.scalar_one_or_none()
         if not funcionario:
             raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Funcionário não encontrado"
@@ -170,7 +175,8 @@ async def put_funcionario(
             
         # Verifica se está tentando atualizar para um CPF que já existe
         if funcionario_data.cpf and funcionario_data.cpf != funcionario.cpf:
-            existing_funcionario = db.query(FuncionarioDB).filter(FuncionarioDB.cpf == funcionario_data.cpf).first()
+            result = await db.execute(select(FuncionarioDB).where(FuncionarioDB.cpf == funcionario_data.cpf))
+            existing_funcionario = result.scalar_one_or_none()
             
             if existing_funcionario:
                 raise HTTPException(
@@ -185,11 +191,11 @@ async def put_funcionario(
         update_data = funcionario_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(funcionario, field, value)
-        db.commit()
-        db.refresh(funcionario)    
+        await db.commit()
+        await db.refresh(funcionario)    
         
         # Depois de tudo executado e antes do return, registra a ação na auditoria
-        AuditoriaService.registrar_acao(
+        await AuditoriaService.registrar_acao(
             db=db,
             funcionario_id=current_user.id,
             acao="UPDATE",
@@ -204,7 +210,7 @@ async def put_funcionario(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro ao atualizar funcionário: {str(e)}"
         )
@@ -214,21 +220,22 @@ async def put_funcionario(
 async def delete_funcionario(
     request: Request,
     id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(require_group([1]))):
     
     """Remove um funcionário"""
     try:
-        funcionario = db.query(FuncionarioDB).filter(FuncionarioDB.id == id).first()
+        result = await db.execute(select(FuncionarioDB).where(FuncionarioDB.id == id))
+        funcionario = result.scalar_one_or_none()
         if not funcionario:
             raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Funcionário não encontrado"
             )
-        db.delete(funcionario)
-        db.commit()
+        await db.delete(funcionario)
+        await db.commit()
         # Depois de tudo executado e antes do return, registra a ação na auditoria
-        AuditoriaService.registrar_acao(
+        await AuditoriaService.registrar_acao(
             db=db,
             funcionario_id=current_user.id,
             acao="DELETE",
@@ -243,7 +250,7 @@ async def delete_funcionario(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail=f"Erro ao deletar funcionário: {str(e)}"

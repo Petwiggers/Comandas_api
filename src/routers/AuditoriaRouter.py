@@ -2,12 +2,12 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import desc
-from sqlalchemy.orm import Session
+from sqlalchemy import desc, select, func
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from domain.schemas.AuditoriaSchema import AuditoriaResponse
 from domain.schemas.AuthSchema import FuncionarioAuth
-from infra.database import get_db
+from infra.database import get_async_db
 from infra.dependencies import require_group
 from infra.orm.AuditoriaModel import AuditoriaDB
 from infra.orm.FuncionarioModel import FuncionarioDB
@@ -42,7 +42,7 @@ async def listar_auditoria(
     limite: int = Query(
         100, ge=1, le=1000, description="Limite de registros"
     ),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(require_group([1])),
 ):
     """
@@ -51,23 +51,24 @@ async def listar_auditoria(
     Apenas administradores podem acessar.
     """
     try:
-        # Construir query base com joins manuais
-        query = db.query(AuditoriaDB, FuncionarioDB).join(
+        # Construir query base com joins
+        query = select(AuditoriaDB, FuncionarioDB).outerjoin(
             FuncionarioDB, FuncionarioDB.id == AuditoriaDB.funcionario_id
         )
+        
         # Aplicar filtros
         if funcionario_id:
-            query = query.filter(AuditoriaDB.funcionario_id == funcionario_id)
+            query = query.where(AuditoriaDB.funcionario_id == funcionario_id)
         if acao:
             acoes_list = [a.strip().upper() for a in acao.split(",")]
-            query = query.filter(AuditoriaDB.acao.in_(acoes_list))
+            query = query.where(AuditoriaDB.acao.in_(acoes_list))
         if recurso:
             recursos_list = [r.strip().upper() for r in recurso.split(",")]
-            query = query.filter(AuditoriaDB.recurso.in_(recursos_list))
+            query = query.where(AuditoriaDB.recurso.in_(recursos_list))
         if data_inicio:
             try:
                 data_inicio_dt = datetime.strptime(data_inicio, "%Y-%m-%d")
-                query = query.filter(AuditoriaDB.data_hora >= data_inicio_dt)
+                query = query.where(AuditoriaDB.data_hora >= data_inicio_dt)
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -76,7 +77,7 @@ async def listar_auditoria(
         if data_fim:
             try:
                 data_fim_dt = datetime.strptime(data_fim, "%Y-%m-%d")
-                query = query.filter(AuditoriaDB.data_hora <= data_fim_dt)
+                query = query.where(AuditoriaDB.data_hora <= data_fim_dt)
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -84,20 +85,22 @@ async def listar_auditoria(
                 )
         
         # Contar total para metadata
-        total_count = query.count()
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await db.execute(count_query)
+        total_count = total_result.scalar()
         
         # Ordenar por data descendente, aplicar paginação e limitar
-        auditorias = (
+        result = await db.execute(
             query.order_by(desc(AuditoriaDB.data_hora))
             .offset(skip)
             .limit(limite)
-            .all()
         )
+        auditorias = result.all()
         
         # Montar response
-        result = []
+        result_list = []
         for auditoria, funcionario in auditorias:
-            result.append(
+            result_list.append(
                 AuditoriaResponse(
                     id=auditoria.id,
                     funcionario_id=auditoria.funcionario_id,
@@ -106,7 +109,7 @@ async def listar_auditoria(
                         "nome": funcionario.nome,
                         "matricula": funcionario.matricula,
                         "grupo": funcionario.grupo,
-                    },
+                    } if funcionario else None,
                     acao=auditoria.acao,
                     recurso=auditoria.recurso,
                     recurso_id=auditoria.recurso_id,
@@ -117,7 +120,7 @@ async def listar_auditoria(
                     data_hora=auditoria.data_hora,
                 )
             )
-        return result
+        return result_list
     except HTTPException:
         raise
     except Exception as e:
@@ -135,7 +138,7 @@ async def listar_auditoria(
 @limiter.limit(get_rate_limit("light"))
 async def listar_acoes_disponiveis(
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(require_group([1])),
 ):
     """
@@ -143,9 +146,13 @@ async def listar_acoes_disponiveis(
     Retorna apenas ações e recursos que possuem registros de auditoria.
     """
     try:
-        # Buscar ações e recursos distintos no banco de dados
-        acoes_db = db.query(AuditoriaDB.acao).distinct().all()
-        recursos_db = db.query(AuditoriaDB.recurso).distinct().all()
+        # Buscar ações distintas
+        acoes_result = await db.execute(select(AuditoriaDB.acao).distinct())
+        acoes_db = acoes_result.all()
+        
+        # Buscar recursos distintas
+        recursos_result = await db.execute(select(AuditoriaDB.recurso).distinct())
+        recursos_db = recursos_result.all()
 
         # Montar response com dados reais do banco
         return {

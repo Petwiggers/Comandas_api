@@ -1,5 +1,5 @@
 #Peterson Wiggers
-@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWQiOjEsImdydXBvIjoxLCJleHAiOjE3NzU5NDAzNjIsInR5cGUiOiJhY2Nlc3MifQ.f1E4jj5CQs5qZsD2O8ca7gz2o9IsN_zBqM_5OjvCWUc
+@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWQiOjEsImdydXBvIjoxLCJleHAiOjE3NzYwMTQwMjUsInR5cGUiOiJhY2Nlc3MifQ.5YyrO3bnvJf42fHD_XzoeMHxQ1sDFSkhzHPi-k0KTBU
 
 ### Verbo GET – listar todos
 GET http://localhost:8000/cliente/ HTTP/1.1
@@ -31,3 +31,4 @@ Content-Type: application/json
 
 ### Verbo DELETE - excluir
 DELETE http://127.0.0.1:8000/cliente/1 HTTP/1.1
+Authorization: Bearer {{access_token}}

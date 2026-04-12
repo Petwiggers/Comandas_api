@@ -1,5 +1,5 @@
 #Peterson Wiggers
-@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTExMTExMTExMSIsImlkIjoyLCJncnVwbyI6MSwiZXhwIjoxNzc0NzMzODY2LCJ0eXBlIjoiYWNjZXNzIn0.3L3LwnWzYSHEJ-Ipnh4U4clc_Th6RqL3WqdxL_5BDLY
+@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWQiOjEsImdydXBvIjoxLCJleHAiOjE3NzYwMTQwMjUsInR5cGUiOiJhY2Nlc3MifQ.5YyrO3bnvJf42fHD_XzoeMHxQ1sDFSkhzHPi-k0KTBU
 ### Verbo GET – listar todos
 GET http://localhost:8000/funcionario/ HTTP/1.1
 Authorization: Bearer {{access_token}}
@@ -16,7 +16,7 @@ Content-Type: application/json
   "matricula": "MAT2026001",
   "cpf": "00000000000",
   "telefone": "49999998888",
-  "grupo": 0,
+  "grupo": 2,
   "senha": "senha123"
 }
 
@@ -78,19 +78,19 @@ Content-Type: application/json
 
 
 ### Verbo PUT – atualiza
-PUT http://127.0.0.1:8000/funcionario/1 HTTP/1.1
+PUT http://127.0.0.1:8000/funcionario/2 HTTP/1.1
 Authorization: Bearer {{access_token}}
 Content-Type: application/json
 
 {
-  "nome": "Peterson Wiggers",
+  "nome": "Larissa Bergmeier",
   "matricula": "MAT2001",
-  "cpf": "00000000000",
+  "cpf": "12548",
   "telefone": "49999998888",
   "grupo": 3,
   "senha": "senha123"
 }
 
 ### Verbo DELETE - excluir
-DELETE http://127.0.0.1:8000/funcionario/1 HTTP/1.1
+DELETE http://127.0.0.1:8000/funcionario/3 HTTP/1.1
 Authorization: Bearer {{access_token}}

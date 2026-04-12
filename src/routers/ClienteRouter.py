@@ -1,7 +1,7 @@
 #Peterson Wiggers
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import asc
-from sqlalchemy.orm import Session
+from sqlalchemy import asc, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 # Domain Schemas
@@ -16,7 +16,7 @@ from services.AuditoriaService import AuditoriaService
 # Infra
 from infra.dependencies import get_current_active_user, require_group
 from infra.orm.ClienteModel import ClienteDB
-from infra.database import get_db
+from infra.database import get_async_db
 from infra.rate_limit import get_rate_limit, limiter 
 
 router = APIRouter()
@@ -26,7 +26,7 @@ router = APIRouter()
 @limiter.limit(get_rate_limit("moderate"))
 async def get_cliente(
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(get_current_active_user),
     skip: int = Query(0, ge=0, description="Número de registros para pular"),
     limite: int = Query(
@@ -34,13 +34,13 @@ async def get_cliente(
     ),):
     """Retorna todos os clientes"""
     try:
-        clientes = (
-            db.query(ClienteDB)
+        result = await db.execute(
+            select(ClienteDB)
             .order_by(asc(ClienteDB.id))
             .offset(skip)
             .limit(limite)
-            .all()
         )
+        clientes = result.scalars().all()
         return clientes
     except Exception as e:
         raise HTTPException(
@@ -54,12 +54,13 @@ async def get_cliente(
 async def get_cliente(
     request: Request,
     id: int, 
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(get_current_active_user),):
     
     """Retorna um cliente específico pelo ID"""
     try:
-        cliente = db.query(ClienteDB).filter(ClienteDB.id == id).first()
+        result = await db.execute(select(ClienteDB).where(ClienteDB.id == id))
+        cliente = result.scalar_one_or_none()
         if not cliente:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado")
         return cliente
@@ -76,13 +77,14 @@ async def get_cliente(
 async def post_cliente(
     request: Request,
     cliente_data: ClienteCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(require_group([1,3]))):
     
     """Cria um novo cliente"""
     try:
         # Verifica se já existe cliente com este CPF
-        existing_cliente = db.query(ClienteDB).filter(ClienteDB.cpf == cliente_data.cpf).first()
+        result = await db.execute(select(ClienteDB).where(ClienteDB.cpf == cliente_data.cpf))
+        existing_cliente = result.scalar_one_or_none()
         if existing_cliente:
             raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Já existe um cliente com este CPF"
@@ -95,9 +97,9 @@ async def post_cliente(
         telefone=cliente_data.telefone
         )
         db.add(novo_cliente)
-        db.commit()
-        db.refresh(novo_cliente)
-        AuditoriaService.registrar_acao(
+        await db.commit()
+        await db.refresh(novo_cliente)
+        await AuditoriaService.registrar_acao(
             db=db,
             funcionario_id=current_user.id,
             acao="CREATE",
@@ -111,7 +113,7 @@ async def post_cliente(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro ao criar cliente: {str(e)}"
         )
@@ -122,11 +124,12 @@ async def put_cliente(
     request: Request,
     id: int,
     cliente_data: ClienteUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(require_group([1,3]))):
     """Atualiza um cliente existente"""
     try:
-        cliente = db.query(ClienteDB).filter(ClienteDB.id == id).first()
+        result = await db.execute(select(ClienteDB).where(ClienteDB.id == id))
+        cliente = result.scalar_one_or_none()
         if not cliente:
             raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado"
@@ -134,7 +137,8 @@ async def put_cliente(
             
         # Verifica se está tentando atualizar para um CPF que já existe
         if cliente_data.cpf and cliente_data.cpf != cliente.cpf:
-            existing_cliente = db.query(ClienteDB).filter(ClienteDB.cpf == cliente_data.cpf).first()
+            result = await db.execute(select(ClienteDB).where(ClienteDB.cpf == cliente_data.cpf))
+            existing_cliente = result.scalar_one_or_none()
             
             if existing_cliente:
                 raise HTTPException(
@@ -146,9 +150,9 @@ async def put_cliente(
         update_data = cliente_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(cliente, field, value)
-        db.commit()
-        db.refresh(cliente)
-        AuditoriaService.registrar_acao(
+        await db.commit()
+        await db.refresh(cliente)
+        await AuditoriaService.registrar_acao(
             db=db,
             funcionario_id=current_user.id,
             acao="UPDATE",
@@ -161,7 +165,7 @@ async def put_cliente(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro ao atualizar cliente: {str(e)}"
         )
@@ -171,19 +175,20 @@ async def put_cliente(
 async def delete_cliente(
     request: Request,
     id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(require_group([1]))):
     """Remove um cliente"""
     try:
-        cliente = db.query(ClienteDB).filter(ClienteDB.id == id).first()
+        result = await db.execute(select(ClienteDB).where(ClienteDB.id == id))
+        cliente = result.scalar_one_or_none()
         if not cliente:
             raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Cliente não encontrado"
             )
-        db.delete(cliente)
-        db.commit()
-        AuditoriaService.registrar_acao(
+        await db.delete(cliente)
+        await db.commit()
+        await AuditoriaService.registrar_acao(
             db=db,
             funcionario_id=current_user.id,
             acao="DELETE",
@@ -197,7 +202,7 @@ async def delete_cliente(
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail=f"Erro ao deletar cliente: {str(e)}"

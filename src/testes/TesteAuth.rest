@@ -1,6 +1,6 @@
 ### token gerado
 
-@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzMzMzMzMzMzMyIsImlkIjo0LCJncnVwbyI6MywiZXhwIjoxNzc0NzMwMzA3LCJ0eXBlIjoiYWNjZXNzIn0.a5K6TBvCMJ2l2EjwxOzKP3Q-iZ6hocHm16R8coRfnDo
+@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWQiOjEsImdydXBvIjoxLCJleHAiOjE3NzYwMTQwMjUsInR5cGUiOiJhY2Nlc3MifQ.5YyrO3bnvJf42fHD_XzoeMHxQ1sDFSkhzHPi-k0KTBU
 @refresh_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzMzMzMzMzMzMyIsImlkIjo0LCJncnVwbyI6MywiZXhwIjoxNzc1MzM0MjA3LCJ0eXBlIjoicmVmcmVzaCJ9.M4W5bFU-51uiwG7qiy8WOttNXbSGnYNC0ykDWOapJmw
 
 ### Login para obter access e refresh tokens
@@ -8,7 +8,7 @@ POST http://127.0.0.1:8000/auth/login HTTP/1.1
 content-type: application/json
 
 {
-"cpf" : "33333333333",
+"cpf" : "1",
 "senha" : "senha123"
 }
 
@@ -24,7 +24,7 @@ content-type: application/json
 GET http://127.0.0.1:8000/auth/me HTTP/1.1
 Authorization: Bearer {{access_token}}
 
-### Login para obter dados do usuário autenticadado
+### Login para deslogar do sistema
 POST http://127.0.0.1:8000/auth/logout HTTP/1.1
 Authorization: Bearer {{access_token}}
 

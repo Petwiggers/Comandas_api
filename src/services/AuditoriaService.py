@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Request
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -10,8 +10,8 @@ class AuditoriaService:
     """Serviço para registrar auditoria de acessos e ações"""
 
     @staticmethod
-    def registrar_acao(
-        db: Session,
+    async def registrar_acao(
+        db: AsyncSession,
         funcionario_id: int,
         acao: str,
         recurso: str,
@@ -74,8 +74,8 @@ class AuditoriaService:
                 data_hora=datetime.now(),
             )
             db.add(auditoria)
-            db.commit()
+            await db.commit()
             return True
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             return False
