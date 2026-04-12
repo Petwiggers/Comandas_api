@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import asc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 
 # Domain Schemas
 from domain.schemas.ClienteSchema import (
@@ -29,14 +29,29 @@ async def get_cliente(
     db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(get_current_active_user),
     skip: int = Query(0, ge=0, description="Número de registros para pular"),
-    limite: int = Query(
-        100, ge=1, le=1000, description="Limite de registros"
-    ),):
-    """Retorna todos os clientes"""
+    limite: int = Query(100, ge=1, le=1000, description="Limite de registros"),
+    id: Optional[int] = Query(None, description="Filtrar por ID"),
+    nome: Optional[str] = Query(None, description="Filtrar por nome"),
+    cpf: Optional[str] = Query(None, description="Filtrar por CPF"),
+    telefone: Optional[str] = Query(None, description="Filtrar por telefone"),
+):
+    """Retorna todos os clientes com filtros e paginação"""
     try:
+        query = select(ClienteDB)
+        
+        # Aplicar filtros
+        if id is not None:
+            query = query.where(ClienteDB.id == id)
+        if nome is not None:
+            query = query.where(ClienteDB.nome.ilike(f"%{nome}%"))
+        if cpf is not None:
+            query = query.where(ClienteDB.cpf == cpf)
+        if telefone is not None:
+            query = query.where(ClienteDB.telefone.ilike(f"%{telefone}%"))
+        
+        # Aplicar paginação e ordenação
         result = await db.execute(
-            select(ClienteDB)
-            .order_by(asc(ClienteDB.id))
+            query.order_by(asc(ClienteDB.id))
             .offset(skip)
             .limit(limite)
         )

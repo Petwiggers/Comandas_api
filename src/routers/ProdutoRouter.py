@@ -1,8 +1,10 @@
 #Peterson Wiggers
+from unittest import result
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import List
+from typing import List, Optional
 
 import base64
 
@@ -32,15 +34,49 @@ async def get_produto(
     db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(get_current_active_user),
     skip: int = Query(0, ge=0, description="Número de registros para pular"),
-    limite: int = Query(
-        100, ge=1, le=1000, description="Limite de registros"
-    )):
-    
-    """Retorna todos os Produtos"""
+    limite: int = Query(100, ge=1, le=1000, description="Limite de registros"),
+    id: Optional[int] = Query(None, description="Filtrar por ID"),
+    nome: Optional[str] = Query(None, description="Filtrar por nome"),
+    descricao: Optional[str] = Query(None, description="Filtrar por descrição"),
+    valor_igual: Optional[float] = Query(None, description="Filtrar por valor exato"),
+    valor_gte: Optional[float] = Query(None, description="Valor maior ou igual"),
+    valor_lte: Optional[float] = Query(None, description="Valor menor ou igual"),
+    valor_min: Optional[float] = Query(None, description="Valor mínimo (intervalo)"),
+    valor_max: Optional[float] = Query(None, description="Valor máximo (intervalo)"),
+):
+    """Retorna todos os Produtos com filtros e paginação"""
     try:
+        query = select(ProdutoDB)
+        
+        # Aplicar filtros
+        if id is not None:
+            query = query.where(ProdutoDB.id == id)
+        if nome is not None:
+            query = query.where(ProdutoDB.nome.ilike(f"%{nome}%"))
+        if descricao is not None:
+            query = query.where(ProdutoDB.descricao.ilike(f"%{descricao}%"))
+        
+        # Filtros de valor
+        if valor_igual is not None:
+            query = query.where(ProdutoDB.valor_unitario == valor_igual)
+        if valor_gte is not None:
+            query = query.where(ProdutoDB.valor_unitario >= valor_gte)
+        if valor_lte is not None:
+            query = query.where(ProdutoDB.valor_unitario <= valor_lte)
+        # Intervalo: valor_min até valor_max
+        if valor_min is not None and valor_max is not None:
+            query = query.where(
+                (ProdutoDB.valor_unitario >= valor_min) & 
+                (ProdutoDB.valor_unitario <= valor_max)
+            )
+        elif valor_min is not None:
+            query = query.where(ProdutoDB.valor_unitario >= valor_min)
+        elif valor_max is not None:
+            query = query.where(ProdutoDB.valor_unitario <= valor_max)
+        
+        # Aplicar paginação
         result = await db.execute(
-            select(ProdutoDB)
-            .offset(skip)
+            query.offset(skip)
             .limit(limite)
         )
         produtos = result.scalars().all()
@@ -57,18 +93,53 @@ async def get_produto(
     request: Request,
     db: AsyncSession = Depends(get_async_db),
     skip: int = Query(0, ge=0, description="Número de registros para pular"),
-    limite: int = Query(
-        100, ge=1, le=1000, description="Limite de registros"
-    )):
+    limite: int = Query(100, ge=1, le=1000, description="Limite de registros"),
+    id: Optional[int] = Query(None, description="Filtrar por ID"),
+    nome: Optional[str] = Query(None, description="Filtrar por nome"),
+    descricao: Optional[str] = Query(None, description="Filtrar por descrição"),
+    valor_igual: Optional[float] = Query(None, description="Filtrar por valor exato"),
+    valor_gte: Optional[float] = Query(None, description="Valor maior ou igual"),
+    valor_lte: Optional[float] = Query(None, description="Valor menor ou igual"),
+    valor_min: Optional[float] = Query(None, description="Valor mínimo (intervalo)"),
+    valor_max: Optional[float] = Query(None, description="Valor máximo (intervalo)")
+):
     """Retorna todos os Produtos"""
     try:
+        query = select(ProdutoDB)
+        
+        # Aplicar filtros
+        if id is not None:
+            query = query.where(ProdutoDB.id == id)
+        if nome is not None:
+            query = query.where(ProdutoDB.nome.ilike(f"%{nome}%"))
+        if descricao is not None:
+            query = query.where(ProdutoDB.descricao.ilike(f"%{descricao}%"))
+        
+        # Filtros de valor
+        if valor_igual is not None:
+            query = query.where(ProdutoDB.valor_unitario == valor_igual)
+        if valor_gte is not None:
+            query = query.where(ProdutoDB.valor_unitario >= valor_gte)
+        if valor_lte is not None:
+            query = query.where(ProdutoDB.valor_unitario <= valor_lte)
+        # Intervalo: valor_min até valor_max
+        if valor_min is not None and valor_max is not None:
+            query = query.where(
+                (ProdutoDB.valor_unitario >= valor_min) & 
+                (ProdutoDB.valor_unitario <= valor_max)
+            )
+        elif valor_min is not None:
+            query = query.where(ProdutoDB.valor_unitario >= valor_min)
+        elif valor_max is not None:
+            query = query.where(ProdutoDB.valor_unitario <= valor_max)
+        
+        # Aplicar paginação
         result = await db.execute(
-            select(ProdutoDB)
-            .offset(skip)
+            query.offset(skip)
             .limit(limite)
         )
         produtos = result.scalars().all()
-        return produtos
+        return produtos 
     except Exception as e:
         raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -130,7 +201,7 @@ async def post_produto(
         db.add(novo_produto)
         await db.commit()
         await db.refresh(novo_produto)
-        AuditoriaService.registrar_acao(
+        await AuditoriaService.registrar_acao(
             db=db,
             funcionario_id=current_user.id,
             acao="CREATE",

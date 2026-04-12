@@ -1,5 +1,5 @@
 #Peterson Wiggers
-@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWQiOjEsImdydXBvIjoxLCJleHAiOjE3NzYwMTQwMjUsInR5cGUiOiJhY2Nlc3MifQ.5YyrO3bnvJf42fHD_XzoeMHxQ1sDFSkhzHPi-k0KTBU
+@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWQiOjEsImdydXBvIjoxLCJleHAiOjE3NzYwMTYyNDIsInR5cGUiOiJhY2Nlc3MifQ.QENMA64D6Vd4yZtHYiRzSUMPkMAuRzL0jMexqHQZB0k
 ### Verbo GET – listar todos
 GET http://localhost:8000/produto/ HTTP/1.1
 Authorization: Bearer {{access_token}}

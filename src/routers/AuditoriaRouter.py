@@ -25,23 +25,17 @@ router = APIRouter()
 @limiter.limit(get_rate_limit("moderate"))
 async def listar_auditoria(
     request: Request,
-    funcionario_id: Optional[int] = Query(
-        None, description="Filtrar por funcionário"
-    ),
-    acao: Optional[str] = Query(
-        None, description="Filtrar por ação (separar múltiplas com vírgula)"
-    ),
-    recurso: Optional[str] = Query(
-        None, description="Filtrar por recurso (separar múltiplos com vírgula)"
-    ),
-    data_inicio: Optional[str] = Query(
-        None, description="Data início (YYYY-MM-DD)"
-    ),
-    data_fim: Optional[str] = Query(None, description="Data fim (YYYY-MM-DD)"),
     skip: int = Query(0, ge=0, description="Número de registros para pular"),
-    limite: int = Query(
-        100, ge=1, le=1000, description="Limite de registros"
-    ),
+    limite: int = Query(100, ge=1, le=1000, description="Limite de registros"),
+    id: Optional[int] = Query(None, description="Filtrar por ID da auditoria"),
+    funcionario_id: Optional[int] = Query(None, description="Filtrar por funcionário"),
+    acao: Optional[str] = Query(None, description="Filtrar por ação (separar múltiplas com vírgula)"),
+    recurso: Optional[str] = Query(None, description="Filtrar por recurso (separar múltiplos com vírgula)"),
+    recurso_id: Optional[int] = Query(None, description="Filtrar por ID do recurso"),
+    ip_address: Optional[str] = Query(None, description="Filtrar por endereço IP"),
+    user_agent: Optional[str] = Query(None, description="Filtrar por User Agent"),
+    data_inicio: Optional[str] = Query(None, description="Data início (YYYY-MM-DD)"),
+    data_fim: Optional[str] = Query(None, description="Data fim (YYYY-MM-DD)"),
     db: AsyncSession = Depends(get_async_db),
     current_user: FuncionarioAuth = Depends(require_group([1])),
 ):
@@ -57,6 +51,8 @@ async def listar_auditoria(
         )
         
         # Aplicar filtros
+        if id is not None:
+            query = query.where(AuditoriaDB.id == id)
         if funcionario_id:
             query = query.where(AuditoriaDB.funcionario_id == funcionario_id)
         if acao:
@@ -65,6 +61,12 @@ async def listar_auditoria(
         if recurso:
             recursos_list = [r.strip().upper() for r in recurso.split(",")]
             query = query.where(AuditoriaDB.recurso.in_(recursos_list))
+        if recurso_id is not None:
+            query = query.where(AuditoriaDB.recurso_id == recurso_id)
+        if ip_address is not None:
+            query = query.where(AuditoriaDB.ip_address == ip_address)
+        if user_agent is not None:
+            query = query.where(AuditoriaDB.user_agent.ilike(f"%{user_agent}%"))
         if data_inicio:
             try:
                 data_inicio_dt = datetime.strptime(data_inicio, "%Y-%m-%d")
@@ -84,12 +86,7 @@ async def listar_auditoria(
                     detail="Data fim inválida. Use formato YYYY-MM-DD",
                 )
         
-        # Contar total para metadata
-        count_query = select(func.count()).select_from(query.subquery())
-        total_result = await db.execute(count_query)
-        total_count = total_result.scalar()
-        
-        # Ordenar por data descendente, aplicar paginação e limitar
+        # Ordenar por data descendente, aplicar paginação
         result = await db.execute(
             query.order_by(desc(AuditoriaDB.data_hora))
             .offset(skip)
