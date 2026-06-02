@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional
+from infra.orm.ComandaModel import ComandaDB, ComandaProdutoDB
 from services.AuditoriaService import AuditoriaService
 
 # Domain Schemas
@@ -35,44 +36,45 @@ router = APIRouter()
 )
 @limiter.limit(get_rate_limit("moderate"))
 async def get_recebimento_dashboard(
-    request: Request,
+   request: Request,
     skip: int = Query(0, ge=0, description="Número de registros para pular"),
     limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros"),
-    id: Optional[int] = Query(None, description="Filtrar por ID"),
-    nome: Optional[str] = Query(None, description="Filtrar por nome"),
-    matricula: Optional[str] = Query(None, description="Filtrar por matrícula"),
-    cpf: Optional[str] = Query(None, description="Filtrar por CPF"),
-    grupo: Optional[str] = Query(
-        None,
-        description="Filtrar por grupo: 1=Admin, 2=Balcão, 3=Caixa - Separar por vírgula",
-    ),
-    telefone: Optional[str] = Query(None, description="Filtrar por telefone"),
     db: AsyncSession = Depends(get_async_db),
-    current_user: FuncionarioAuth = Depends(require_group([1])),
+    current_user: FuncionarioAuth = Depends(get_current_active_user),
 ):
     try:
-        query = select(FuncionarioDB)
-        
-        # Aplicar filtros
-        if id is not None:
-            query = query.where(FuncionarioDB.id == id)
-        if nome is not None:
-            query = query.where(FuncionarioDB.nome.ilike(f"%{nome}%"))  # ilike = case insensitive
-        if matricula is not None:
-            query = query.where(FuncionarioDB.matricula == matricula)
-        if cpf is not None:
-            query = query.where(FuncionarioDB.cpf == cpf)
-        if grupo is not None:
-            # Converter string separada por vírgula para lista de inteiros
-            grupos_list = [int(g.strip()) for g in grupo.split(',') if g.strip().isdigit()]
-            query = query.where(FuncionarioDB.grupo.in_(grupos_list))
-        if telefone is not None:
-            query = query.where(FuncionarioDB.telefone.ilike(f"%{telefone}%"))
+        comandas_query = (
+            select(
+                ComandaDB.id,
+                ComandaDB.comanda,
+                ComandaDB.status,
+                ComandaDB.data_hora,
+                func.coalesce(func.sum(ComandaProdutoDB.quantidade * ComandaProdutoDB.valor_unitario), 0).label("total"),
+                func.coalesce(func.sum(ComandaProdutoDB.quantidade), 0).label("quantidade_produtos"),
+            )
+            .join(ComandaProdutoDB, ComandaProdutoDB.comanda_id == ComandaDB.id)
+            .where(ComandaDB.status == 0)
+            .group_by(ComandaDB.id, ComandaDB.comanda, ComandaDB.status, ComandaDB.data_hora)
+            .offset(skip)
+            .limit(limit)
+        )
+        comandas_result = await db.execute(comandas_query)
+        rows = comandas_result.all()
 
-        # Aplicar paginação
-        result = await db.execute(query.offset(skip).limit(limit))
-        funcionarios = result.scalars().all()
-        return funcionarios
+        dashboard_items = [
+            RecebimentoDashboardItem(
+                id=row.id,
+                comanda=row.comanda,
+                status=row.status,
+                cliente=None,
+                total=float(row.total),
+                quantidade_produtos=int(row.quantidade_produtos),
+                data_hora=row.data_hora,
+            )
+            for row in rows
+        ]
+
+        return dashboard_items
     except RateLimitExceeded:
         # Propagar exceção original para o handler personalizado
         raise

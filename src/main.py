@@ -15,6 +15,7 @@ from routers import ProdutoRouter
 from routers import AuditoriaRouter
 from routers import HealthRouter
 from routers import ComandaRouter
+from routers import RecebimentoRouter
 
 #app = FastAPI() # Importar middleware personalizado
 from infra.middleware.IPAccessMiddleware import IPAccessMiddleware
@@ -69,6 +70,7 @@ app.include_router(ProdutoRouter.router)
 app.include_router(AuditoriaRouter.router)
 app.include_router(HealthRouter.router)
 app.include_router(ComandaRouter.router)
-    
+app.include_router(RecebimentoRouter.router)
+
 if __name__ == "__main__":
     uvicorn.run('main:app', host=HOST, port=int(PORT), reload=RELOAD)
