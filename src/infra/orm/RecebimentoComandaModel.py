@@ -10,8 +10,8 @@ class RecebimentoComandaDB(database.Base):
     __tablename__ = 'tb_recebimento_comanda'
     
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    recebimento_id = Column(Integer, nullable=False, index=True) # ID do fechamento do caixa
-    comanda_id = Column(Integer, nullable=False, index=True)     # ID da comanda que foi paga
+    recebimento_id = Column(Integer, ForeignKey("tb_recebimento.id", ondelete="RESTRICT"), nullable=False, index=True)
+    comanda_id = Column(Integer, ForeignKey("tb_comanda.id", ondelete="RESTRICT"), nullable=False, index=True)
     
     def __init__(self, id, recebimento_id, comanda_id):
         self.id = id

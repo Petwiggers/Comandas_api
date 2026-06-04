@@ -5,6 +5,7 @@ from datetime import datetime
 from .ClienteSchema import ClienteResponse
 from .FuncionarioSchema import FuncionarioResponse
 from .ComandaSchema import ComandaResponse
+from .ProdutoSchema import ProdutoResponse
 
 
 # ==========================================
@@ -17,7 +18,7 @@ class RecebimentoDashboardItem(BaseModel):
     id: int
     comanda: str
     status: int
-    cliente: Optional[ClienteResponse] = None
+    cliente:  Optional[str] = None
     total: float
     quantidade_produtos: int
     data_hora: datetime
@@ -66,3 +67,29 @@ class ComprovanteRecebimento(BaseModel):
     recebimento: dict  # Informações gerais da transação
     rodape: dict  # Mensagens customizadas de agradecimento
     data_emissao: datetime
+
+
+class RecebimentoItemDetalhe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    produto_id: int
+    produto: str
+    quantidade: int
+    valor_unitario: float
+    total_item: float
+
+
+class RecebimentoComandaDetalheResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    comanda: str
+    itens: List[RecebimentoItemDetalhe]
+    subtotal: float
+    quantidade_total: int
+
+
+class RecebimentoComandasDetalheResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    comandas: List[RecebimentoComandaDetalheResponse]
+    total_geral: float
+    quantidade_total: int

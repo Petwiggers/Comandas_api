@@ -1,7 +1,7 @@
 # Peterson Wiggers
 from infra import database
 from fastapi import HTTPException, status
-from sqlalchemy import Column, VARCHAR, Integer, DECIMAL, DateTime
+from sqlalchemy import Column, VARCHAR, Integer, DECIMAL, DateTime, ForeignKey
 from datetime import datetime
 
 #Tabela para armazenar os recebimentos, ou seja, os fechamentos de caixa, que podem conter uma ou mais comandas pagas naquele recebimento. O recebimento é o registro do pagamento, enquanto as comandas associadas a ele indicam quais pedidos foram pagos naquele fechamento.
@@ -11,8 +11,8 @@ class RecebimentoDB(database.Base):
     __tablename__ = 'tb_recebimento'
     
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    cliente_id = Column(Integer, nullable=True, index=True) # Pode ser null se não quiserem CPF na nota
-    funcionario_id = Column(Integer, nullable=False, index=True)
+    cliente_id = Column(Integer, ForeignKey("tb_cliente.id", ondelete="RESTRICT"), nullable=True, index=True)
+    funcionario_id = Column(Integer, ForeignKey("tb_funcionario.id", ondelete="RESTRICT"), nullable=False, index=True)
     subtotal_geral = Column(DECIMAL(10, 2), nullable=False)
     desconto_total = Column(DECIMAL(10, 2), nullable=False, default=0.00)
     acrescimo_total = Column(DECIMAL(10, 2), nullable=False, default=0.00)
