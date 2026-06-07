@@ -1,4 +1,6 @@
 #Peterson Wiggers
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -227,6 +229,34 @@ async def post_recebimento_complete(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Nenhuma comanda informada.",
             )
+            
+        # Buscar dados para retorno
+        funcionario_query = select(FuncionarioDB).where(FuncionarioDB.id == recebimento_data.funcionario_id)
+        funcionario_result = await db.execute(funcionario_query)
+        funcionario = funcionario_result.scalar()
+
+        if not funcionario:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Funcionário responsável não encontrado.",
+            )
+        if funcionario.grupo not in [1, 3]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Somente funcionários Admin ou Caixa têm permissão para realizar recebimentos.",
+            )
+
+        cliente = None
+        if recebimento_data.cliente_id:
+            cliente_query = select(ClienteDB).where(ClienteDB.id == recebimento_data.cliente_id)
+            cliente_result = await db.execute(cliente_query)
+            cliente = cliente_result.scalar()
+        
+        if cliente == None and recebimento_data.cliente_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cliente não encontrado.",
+            )
 
         # Buscar todas as comandas
         comandas_query = (
@@ -299,28 +329,6 @@ async def post_recebimento_complete(
         await db.commit()
         await db.refresh(recebimento)
 
-        # Buscar dados para retorno
-        funcionario_query = select(FuncionarioDB).where(FuncionarioDB.id == recebimento_data.funcionario_id)
-        funcionario_result = await db.execute(funcionario_query)
-        funcionario = funcionario_result.scalar()
-
-        if not funcionario:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Funcionário responsável não encontrado.",
-            )
-        if funcionario.grupo not in [1, 3]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Somente funcionários Admin ou Caixa têm permissão para realizar recebimentos.",
-            )
-
-        cliente = None
-        if recebimento_data.cliente_id:
-            cliente_query = select(ClienteDB).where(ClienteDB.id == recebimento_data.cliente_id)
-            cliente_result = await db.execute(cliente_query)
-            cliente = cliente_result.scalar()
-
         # Construir resposta
         funcionario_response = FuncionarioResponse.model_validate(funcionario)
         cliente_response = ClienteResponse.model_validate(cliente) if cliente else None
@@ -350,4 +358,100 @@ async def post_recebimento_complete(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao criar recebimento: {str(e)}",
+        )
+
+@router.get(
+    "/recebimento/comprovante/{recebimento_id}",
+    response_model=ComprovanteRecebimento,
+    tags=["Recebimento"],
+    status_code=status.HTTP_200_OK,
+    summary="Trazer detalhes completos de um recebimento para geração de comprovante, protegida por JWT e grupo 1",
+)
+@limiter.limit(get_rate_limit("moderate"))
+async def get_comprovante(
+    request: Request,
+    recebimento_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: FuncionarioAuth = Depends(get_current_active_user),
+):
+    try:
+        # Buscar o recebimento principal
+        recebimento_query = (
+            select(RecebimentoDB)
+            .where(RecebimentoDB.id == recebimento_id)
+        )
+        recebimento_result = await db.execute(recebimento_query)
+        recebimento = recebimento_result.scalar_one_or_none()
+
+        if not recebimento:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Recebimento não encontrado.",
+            )
+
+        recebimento_comandas_query = (
+            select(ComandaDB)
+            .join(RecebimentoComandaDB, RecebimentoComandaDB.comanda_id == ComandaDB.id)
+            .where(RecebimentoComandaDB.recebimento_id == recebimento_id)
+        )
+        recebimento_comandas_result = await db.execute(recebimento_comandas_query)
+        comandasResult = recebimento_comandas_result.scalars().all()
+
+        if not comandasResult:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Nenhuma comanda vinculada a este recebimento.",
+            )
+
+        cliente = None
+        if recebimento.cliente_id:
+            cliente_query = select(ClienteDB).where(ClienteDB.id == recebimento.cliente_id)
+            cliente_result = await db.execute(cliente_query)
+            cliente = cliente_result.scalar_one_or_none()
+
+        funcionario_query = select(FuncionarioDB).where(FuncionarioDB.id == recebimento.funcionario_id)
+        funcionario_result = await db.execute(funcionario_query)
+        funcionario = funcionario_result.scalar_one_or_none()
+
+        if not funcionario:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Funcionário vinculado ao recebimento não encontrado.",
+            )
+
+        return {
+            "cabecalho": {
+                "razao_social": "Comandas do Peterson LTDA",
+                "cnpj": "44.506.800/0001-54",
+                "endereco": "Av. Mal. Castelo Branco, 170 - Universitário, Lages - SC, 88509-900",
+                "telefone": "(49) 3251-1022",
+            },
+            "cliente": ClienteResponse.model_validate(cliente) if cliente else None,
+            "funcionario": FuncionarioResponse.model_validate(funcionario),
+            "comandas": comandasResult,
+            "resumo_valores": {
+                "subtotal_geral": float(recebimento.subtotal_geral),
+                "desconto_total": float(recebimento.desconto_total),
+                "acrescimo_total": float(recebimento.acrescimo_total),
+                "valor_final": float(recebimento.valor_final),
+            },
+            "recebimento": {
+                "id": recebimento.id,
+                "data_hora": recebimento.data_hora,
+            },
+            "rodape": {
+                "mensagem_agradecimento": "Obrigado pela preferência! Volte sempre!",
+                "redes_sociais": ["Instagram: @comandasdopeterson", "Facebook: /comandasdopeterson"],
+            },
+            "data_emissao": datetime.now(),
+            
+        }
+    except RateLimitExceeded:
+        raise
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar detalhes das comandas: {str(e)}",
         )

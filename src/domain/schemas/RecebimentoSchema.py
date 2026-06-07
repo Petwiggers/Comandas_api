@@ -2,6 +2,7 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Any, Dict
 from datetime import datetime
+
 from .ClienteSchema import ClienteResponse
 from .FuncionarioSchema import FuncionarioResponse
 from .ComandaSchema import ComandaResponse
@@ -93,3 +94,15 @@ class RecebimentoComandasDetalheResponse(BaseModel):
     comandas: List[RecebimentoComandaDetalheResponse]
     total_geral: float
     quantidade_total: int
+    
+class ComprovanteRecebimento(BaseModel):
+    """Dados completos e formatados para gerar a impressão do cupom"""
+    model_config = ConfigDict(from_attributes=True)
+    cabecalho: dict  # Dados do restaurante (Razão Social, CNPJ, etc.)
+    cliente: Optional[ClienteResponse] = None
+    funcionario: FuncionarioResponse
+    comandas: List[ComandaResponse]
+    resumo_valores: dict  # Detalhamento de formas de pagamento e troco
+    recebimento: dict  # Informações gerais da transação
+    rodape: dict  # Mensagens customizadas de agradecimento
+    data_emissao: datetime
