@@ -41,14 +41,14 @@ async def login(request: Request, login_data: LoginRequest, db: AsyncSession = D
         if not funcionario:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="CPF ou senha inválidos",
+                detail="CPF Inválido",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
         if not verify_password(login_data.senha, funcionario.senha):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="CPF ou senha inválidos",
+                detail="Senha inválida",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 

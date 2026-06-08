@@ -64,8 +64,8 @@ async def get_recebimento_dashboard(
                 func.coalesce(func.sum(ComandaProdutoDB.quantidade * ComandaProdutoDB.valor_unitario), 0).label("total"),
                 func.coalesce(func.sum(ComandaProdutoDB.quantidade), 0).label("quantidade_produtos"),
             )
-            .join(ComandaProdutoDB, ComandaProdutoDB.comanda_id == ComandaDB.id, full=True)
-            .join(ClienteDB, ClienteDB.id == ComandaDB.cliente_id, full=True)
+            .outerjoin(ComandaProdutoDB, ComandaProdutoDB.comanda_id == ComandaDB.id)
+            .outerjoin(ClienteDB, ClienteDB.id == ComandaDB.cliente_id)
             .where(ComandaDB.status == 0)
             .group_by(ComandaDB.id, ComandaDB.comanda, ComandaDB.status, ComandaDB.data_hora)
             .offset(skip)

@@ -27,7 +27,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: petwiggers/comandas-api:latest
+    image: comandas_api:caixa2
     container_name: comandas_api
     depends_on:
       db:
