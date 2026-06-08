@@ -42,7 +42,7 @@ router = APIRouter()
     response_model=List[RecebimentoDashboardItem],
     tags=["Recebimento"],
     status_code=status.HTTP_200_OK,
-    summary="Listar itens para o dashboard de recebimento - protegida por JWT e grupo 1",
+    summary="Listar itens para o dashboard de recebimento",
 )
 @limiter.limit(get_rate_limit("moderate"))
 async def get_recebimento_dashboard(
@@ -214,7 +214,7 @@ async def get_detalhe_comandas(
     response_model=RecebimentoCompletoResponse,
     tags=["Recebimento"],
     status_code=status.HTTP_201_CREATED,
-    summary="Confirmar pagamento e criar recebimento completo, protegida por JWT e grupo 1",
+    summary="Confirmar pagamento e criar recebimento completo",
 )
 @limiter.limit(get_rate_limit("moderate"))
 async def post_recebimento_complete(
@@ -365,7 +365,7 @@ async def post_recebimento_complete(
     response_model=ComprovanteRecebimento,
     tags=["Recebimento"],
     status_code=status.HTTP_200_OK,
-    summary="Trazer detalhes completos de um recebimento para geração de comprovante, protegida por JWT e grupo 1",
+    summary="Trazer detalhes completos de um recebimento para geração de comprovante",
 )
 @limiter.limit(get_rate_limit("moderate"))
 async def get_comprovante(
@@ -419,33 +419,33 @@ async def get_comprovante(
                 detail="Funcionário vinculado ao recebimento não encontrado.",
             )
 
-        return {
-            "cabecalho": {
+        return ComprovanteRecebimento(
+            cabecalho={
                 "razao_social": "Comandas do Peterson LTDA",
                 "cnpj": "44.506.800/0001-54",
                 "endereco": "Av. Mal. Castelo Branco, 170 - Universitário, Lages - SC, 88509-900",
                 "telefone": "(49) 3251-1022",
             },
-            "cliente": ClienteResponse.model_validate(cliente) if cliente else None,
-            "funcionario": FuncionarioResponse.model_validate(funcionario),
-            "comandas": comandasResult,
-            "resumo_valores": {
+            cliente=ClienteResponse.model_validate(cliente) if cliente else None,
+            funcionario=FuncionarioResponse.model_validate(funcionario),
+            comandas=comandasResult,
+            resumo_valores={
                 "subtotal_geral": float(recebimento.subtotal_geral),
                 "desconto_total": float(recebimento.desconto_total),
                 "acrescimo_total": float(recebimento.acrescimo_total),
                 "valor_final": float(recebimento.valor_final),
             },
-            "recebimento": {
+            recebimento={
                 "id": recebimento.id,
                 "data_hora": recebimento.data_hora,
             },
-            "rodape": {
+            rodape={
                 "mensagem_agradecimento": "Obrigado pela preferência! Volte sempre!",
                 "redes_sociais": ["Instagram: @comandasdopeterson", "Facebook: /comandasdopeterson"],
             },
-            "data_emissao": datetime.now(),
-            
-        }
+            data_emissao=datetime.now(),
+        )
+        
     except RateLimitExceeded:
         raise
     except HTTPException:
