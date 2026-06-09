@@ -120,6 +120,17 @@ async def get_detalhe_comandas(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="IDs das comandas obrigatórios.",
             )
+        
+        clientes_query = (
+            select(
+                ClienteDB
+            )
+            .join(ComandaDB, ComandaDB.cliente_id == ClienteDB.id)
+            .where(ComandaDB.id.in_(ids))
+            .distinct()
+        )
+        clientes_result = await db.execute(clientes_query)
+        clientes = clientes_result.scalars().all() or None
 
         comandas_query = (
             select(
@@ -134,6 +145,13 @@ async def get_detalhe_comandas(
         )
         comandas_result = await db.execute(comandas_query)
         lista_comandas = comandas_result.all()
+
+        if len(lista_comandas) != len(ids):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Uma ou mais comandas não foram encontradas.",
+            )
+
         if any(row.status != 0 for row in lista_comandas):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -198,6 +216,7 @@ async def get_detalhe_comandas(
             "comandas": comandas_detalhes,
             "total_geral": float(total_geral),
             "quantidade_total": int(quantidade_total),
+            "clientes": clientes
         }
     except RateLimitExceeded:
         raise

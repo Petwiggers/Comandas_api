@@ -24,7 +24,6 @@ class RecebimentoDashboardItem(BaseModel):
     quantidade_produtos: int
     data_hora: datetime
 
-
 # ==========================================
 # SCHEMAS DE ENVIO E RESPOSTA (POST)
 # ==========================================
@@ -52,11 +51,9 @@ class RecebimentoCompletoResponse(BaseModel):
     funcionario: FuncionarioResponse
     data_hora: datetime
 
-
 # ==========================================
 # SCHEMA DE COMPROVANTE (Impressão)
 # ==========================================
-
 
 class RecebimentoItemDetalhe(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -67,7 +64,6 @@ class RecebimentoItemDetalhe(BaseModel):
     valor_unitario: float
     total_item: float
 
-
 class RecebimentoComandaDetalheResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -76,12 +72,12 @@ class RecebimentoComandaDetalheResponse(BaseModel):
     subtotal: float
     quantidade_total: int
 
-
 class RecebimentoComandasDetalheResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     comandas: List[RecebimentoComandaDetalheResponse]
     total_geral: float
     quantidade_total: int
+    clientes: Optional[List[ClienteResponse]] = None
     
 class ComprovanteRecebimento(BaseModel):
     """Dados completos e formatados para gerar a impressão do cupom"""
