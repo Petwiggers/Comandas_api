@@ -50,7 +50,7 @@ async def get_recebimento_dashboard(
     skip: int = Query(0, ge=0, description="Número de registros para pular"),
     limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros"),
     db: AsyncSession = Depends(get_async_db),
-    current_user: FuncionarioAuth = Depends(get_current_active_user),
+    current_user: FuncionarioAuth = Depends(require_group([1,3]))
 ):
     try:
         comandas_query = (
@@ -111,7 +111,7 @@ async def get_detalhe_comandas(
     request: Request,
     comandas_ids: str,
     db: AsyncSession = Depends(get_async_db),
-    current_user: FuncionarioAuth = Depends(get_current_active_user),
+    current_user: FuncionarioAuth = Depends(require_group([1,3]))
 ):
     try:
         ids = [int(id_) for id_ in comandas_ids.split(",") if id_.strip()]
@@ -240,7 +240,7 @@ async def post_recebimento_complete(
     request: Request,
     recebimento_data: RecebimentoCompletoRequest,
     db: AsyncSession = Depends(get_async_db),
-    current_user: FuncionarioAuth = Depends(get_current_active_user),
+    current_user: FuncionarioAuth = Depends(require_group([1,3]))
 ):
     try:
         if not recebimento_data.comandas_ids:
@@ -391,7 +391,7 @@ async def get_comprovante(
     request: Request,
     recebimento_id: int,
     db: AsyncSession = Depends(get_async_db),
-    current_user: FuncionarioAuth = Depends(get_current_active_user),
+    current_user: FuncionarioAuth = Depends(require_group([1,3]))
 ):
     try:
         # Buscar o recebimento principal
