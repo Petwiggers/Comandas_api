@@ -3,7 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from typing import List, Optional
 from infra.orm.ClienteModel import ClienteDB
 from infra.orm.ComandaModel import ComandaDB, ComandaProdutoDB
@@ -19,6 +19,8 @@ from domain.schemas.RecebimentoSchema import (
     RecebimentoCompletoResponse,
     RecebimentoDashboardItem,
     RecebimentoComandasDetalheResponse,
+    RecebimentoListItem,
+    RecebimentoEditRequest,
 )
 from domain.schemas.AuthSchema import FuncionarioAuth
 from domain.schemas.ClienteSchema import ClienteResponse
@@ -464,7 +466,7 @@ async def get_comprovante(
             },
             data_emissao=datetime.now(),
         )
-        
+
     except RateLimitExceeded:
         raise
     except HTTPException:
@@ -473,4 +475,226 @@ async def get_comprovante(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao buscar detalhes das comandas: {str(e)}",
+        )
+
+
+@router.get(
+    "/recebimento/",
+    response_model=List[RecebimentoListItem],
+    tags=["Recebimento"],
+    status_code=status.HTTP_200_OK,
+    summary="Listar recebimentos realizados",
+)
+@limiter.limit(get_rate_limit("moderate"))
+async def get_recebimentos(
+    request: Request,
+    skip: int = Query(0, ge=0, description="Número de registros para pular"),
+    limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: FuncionarioAuth = Depends(require_group([1, 3]))
+):
+    try:
+        query = (
+            select(
+                RecebimentoDB.id,
+                RecebimentoDB.data_hora,
+                RecebimentoDB.subtotal_geral,
+                RecebimentoDB.desconto_total,
+                RecebimentoDB.acrescimo_total,
+                RecebimentoDB.valor_final,
+                RecebimentoDB.funcionario_id,
+                FuncionarioDB.nome.label("funcionario_nome"),
+                RecebimentoDB.cliente_id,
+                ClienteDB.nome.label("cliente_nome"),
+            )
+            .join(FuncionarioDB, FuncionarioDB.id == RecebimentoDB.funcionario_id)
+            .outerjoin(ClienteDB, ClienteDB.id == RecebimentoDB.cliente_id)
+            .order_by(RecebimentoDB.data_hora.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await db.execute(query)
+        rows = result.all()
+
+        return [
+            RecebimentoListItem(
+                id=row.id,
+                data_hora=row.data_hora,
+                subtotal_geral=float(row.subtotal_geral),
+                desconto_total=float(row.desconto_total),
+                acrescimo_total=float(row.acrescimo_total),
+                valor_final=float(row.valor_final),
+                funcionario_id=row.funcionario_id,
+                funcionario_nome=row.funcionario_nome,
+                cliente_id=row.cliente_id,
+                cliente_nome=row.cliente_nome,
+            )
+            for row in rows
+        ]
+    except RateLimitExceeded:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao listar recebimentos: {str(e)}",
+        )
+
+
+@router.put(
+    "/recebimento/{recebimento_id}",
+    response_model=RecebimentoListItem,
+    tags=["Recebimento"],
+    status_code=status.HTTP_200_OK,
+    summary="Editar desconto, acréscimo e cliente de um recebimento (grupo 1)",
+)
+@limiter.limit(get_rate_limit("moderate"))
+async def put_recebimento(
+    request: Request,
+    recebimento_id: int,
+    dados: RecebimentoEditRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: FuncionarioAuth = Depends(require_group([1]))
+):
+    try:
+        recebimento_result = await db.execute(
+            select(RecebimentoDB).where(RecebimentoDB.id == recebimento_id)
+        )
+        recebimento = recebimento_result.scalar_one_or_none()
+
+        if not recebimento:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Recebimento não encontrado.",
+            )
+
+        if dados.cliente_id is not None:
+            cliente_result = await db.execute(
+                select(ClienteDB).where(ClienteDB.id == dados.cliente_id)
+            )
+            if not cliente_result.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Cliente não encontrado.",
+                )
+
+        recebimento.cliente_id = dados.cliente_id
+        recebimento.desconto_total = dados.desconto_total
+        recebimento.acrescimo_total = dados.acrescimo_total
+        recebimento.valor_final = float(recebimento.subtotal_geral) - dados.desconto_total + dados.acrescimo_total
+
+        await db.commit()
+        await db.refresh(recebimento)
+
+        funcionario_result = await db.execute(
+            select(FuncionarioDB).where(FuncionarioDB.id == recebimento.funcionario_id)
+        )
+        funcionario = funcionario_result.scalar_one()
+
+        cliente_nome = None
+        if recebimento.cliente_id:
+            cliente_result = await db.execute(
+                select(ClienteDB).where(ClienteDB.id == recebimento.cliente_id)
+            )
+            cliente = cliente_result.scalar_one_or_none()
+            cliente_nome = cliente.nome if cliente else None
+
+        return RecebimentoListItem(
+            id=recebimento.id,
+            data_hora=recebimento.data_hora,
+            subtotal_geral=float(recebimento.subtotal_geral),
+            desconto_total=float(recebimento.desconto_total),
+            acrescimo_total=float(recebimento.acrescimo_total),
+            valor_final=float(recebimento.valor_final),
+            funcionario_id=recebimento.funcionario_id,
+            funcionario_nome=funcionario.nome,
+            cliente_id=recebimento.cliente_id,
+            cliente_nome=cliente_nome,
+        )
+    except RateLimitExceeded:
+        raise
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao editar recebimento: {str(e)}",
+        )
+
+
+@router.delete(
+    "/recebimento/{recebimento_id}",
+    tags=["Recebimento"],
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Excluir recebimento e reabrir comandas vinculadas (grupo 1)",
+)
+@limiter.limit(get_rate_limit("restrictive"))
+async def delete_recebimento(
+    request: Request,
+    recebimento_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: FuncionarioAuth = Depends(require_group([1]))
+):
+    try:
+        recebimento_result = await db.execute(
+            select(RecebimentoDB).where(RecebimentoDB.id == recebimento_id)
+        )
+        recebimento = recebimento_result.scalar_one_or_none()
+
+        if not recebimento:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Recebimento não encontrado.",
+            )
+
+        # Busca as comandas vinculadas a este recebimento
+        comandas_result = await db.execute(
+            select(ComandaDB)
+            .join(RecebimentoComandaDB, RecebimentoComandaDB.comanda_id == ComandaDB.id)
+            .where(RecebimentoComandaDB.recebimento_id == recebimento_id)
+        )
+        comandas_vinculadas = comandas_result.scalars().all()
+
+        # Verifica conflito: existe comanda aberta com o mesmo número que alguma das que seriam reabertas?
+        nomes = [c.comanda for c in comandas_vinculadas]
+        ids_vinculados = [c.id for c in comandas_vinculadas]
+
+        conflito_result = await db.execute(
+            select(ComandaDB.comanda)
+            .where(
+                ComandaDB.comanda.in_(nomes),
+                ComandaDB.status == 0,
+                ComandaDB.id.notin_(ids_vinculados),
+            )
+        )
+        conflitos = conflito_result.scalars().all()
+
+        if conflitos:
+            nomes_conflito = ", ".join(f"'{n}'" for n in conflitos)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Não é possível excluir: já existe(m) comanda(s) {nomes_conflito} abertas no caixa. Feche-as antes de desfazer este recebimento.",
+            )
+
+        # Reabre as comandas (status 0 = aberta)
+        for comanda in comandas_vinculadas:
+            comanda.status = 0
+
+        # Remove os vínculos antes de deletar o recebimento (restrição de chave estrangeira)
+        await db.execute(
+            delete(RecebimentoComandaDB).where(RecebimentoComandaDB.recebimento_id == recebimento_id)
+        )
+
+        await db.delete(recebimento)
+        await db.commit()
+
+    except RateLimitExceeded:
+        raise
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao excluir recebimento: {str(e)}",
         )

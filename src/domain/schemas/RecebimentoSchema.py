@@ -79,6 +79,34 @@ class RecebimentoComandasDetalheResponse(BaseModel):
     quantidade_total: int
     clientes: Optional[List[ClienteResponse]] = None
     
+# ==========================================
+# SCHEMAS DE LISTAGEM E EDIÇÃO
+# ==========================================
+
+class RecebimentoListItem(BaseModel):
+    """Item da listagem de recebimentos para o frontend"""
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    data_hora: datetime
+    subtotal_geral: float
+    desconto_total: float
+    acrescimo_total: float
+    valor_final: float
+    funcionario_id: int
+    funcionario_nome: str
+    cliente_id: Optional[int] = None
+    cliente_nome: Optional[str] = None
+
+class RecebimentoEditRequest(BaseModel):
+    """Payload para editar desconto, acréscimo e cliente de um recebimento"""
+    cliente_id: Optional[int] = None
+    desconto_total: float = 0.0
+    acrescimo_total: float = 0.0
+
+# ==========================================
+# SCHEMA DE COMPROVANTE (Impressão)
+# ==========================================
+
 class ComprovanteRecebimento(BaseModel):
     """Dados completos e formatados para gerar a impressão do cupom"""
     model_config = ConfigDict(from_attributes=True)
